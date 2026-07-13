@@ -6,9 +6,9 @@ It is a local web app, not a signed macOS application. It does not require an Ap
 
 ## Start
 
-Double-click `start.command`. The local server opens Margin in your default browser at `http://127.0.0.1:4317`.
+Margin runs automatically: a login agent starts the local server at every boot and restarts it if it stops. Open **http://margin.local** (or `http://127.0.0.1:4317`) in your browser.
 
-If macOS asks whether to open the script, choose **Open**. Keep the Terminal window open while using Margin; close it or press `Control-C` to stop the local server.
+To run it by hand instead, double-click `start.command`; it serves the same address. Keep that Terminal window open while using Margin and press `Control-C` to stop it.
 
 ## Stage 1: take page-linked notes
 
