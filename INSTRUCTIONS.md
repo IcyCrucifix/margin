@@ -1,6 +1,6 @@
-# Agent Handoff — Margin (Content Reader + Notes)
+# Instructions & Work Record — Margin (Content Reader + Notes)
 
-This file briefs any AI agent continuing work on this project. Read it fully before changing anything.
+This is the project's instruction markdown. It records the original assignment, the deliberate work done so far (with reasoning), and the standing rules. Any AI agent continuing this project must read this file fully before changing anything.
 
 ## 1. Original project prompt (verbatim, from the owner)
 
@@ -59,7 +59,28 @@ Source is public at `github.com/IcyCrucifix/icycrucifix.github.io` under `margin
 - To verify layout/DOM behavior headlessly on this machine (no Chrome, no node on PATH): compile-free WebKit probe — a Swift script with an offscreen `WKWebView` that loads `http://127.0.0.1:4317`, clicks a lecture card, and `evaluateJavaScript`-measures the DOM. Owner's browser is ChatGPT Atlas (Chromium); it cannot be driven headless while running.
 - Editor changes require rebuilding: edit `web/editor-source.js`, then `node build-editor.mjs` (esbuild binary at `node_modules/.bin/esbuild`).
 
-## 7. Current state / loose ends
+## 7. Deliberate work record (chronological)
+
+### Phase A — initial build (earlier sessions, via Codex)
+Built the complete system from the original prompt: local Python server + web reader, page-linked memo storage with HTML marker comments in the raw note, CodeMirror live-preview editor with MathJax and `\`-triggered LaTeX symbol autocomplete (e.g. `\omega` suggests ω and Ω; typing past an unmatched name dismisses it), byte-for-byte source copies, Obsidian vault layout with two-way wiki links between raw and polished notes, hub index note, course-folder routing, and the Stage-2 / nightly polish pipeline running through the signed-in Codex CLI. The nightly automation lives **in Codex** — that is deliberate and must stay there.
+
+### Phase B — sidebar scrolling + hardening (session of 2026-07-13, via Claude)
+
+1. **Request:** make the thumbnail sidebar scroll like Apple Preview's; fix crash-prone code; change nothing else.
+2. First pass replaced a window-level wheel-capture hijack (which blocked native momentum scrolling and stole editor focus on every tick) with native list scrolling, and added smooth follow-the-selection. Also fixed three latent front-end bugs: `formatDate` threw `RangeError` on malformed dates and killed the whole library render; the drag-drop handler could throw on null `dataTransfer`; dismissing the import dialog with Esc left stale state that silently broke re-selecting the same file.
+3. **Regression found by owner:** arrow keys made the whole page shift, and the sidebar still didn't scroll. Two causes: (a) `scrollIntoView` scrolls *all* scrollable ancestors, not just the list — replaced with `scrollTo` on `#pageList` only; (b) per owner's choice, page navigation moved from Up/Down to **Left/Right arrows** (hints and ARIA labels updated).
+4. **Root cause finally identified and verified:** `.app-shell` and `.reader-layout` used auto-sized CSS grid rows, so tall content (32 thumbnails ≈ 3300px, tall page renders, long notes) grew the entire layout past the viewport. The sidebar was stretched to full content height — there was nothing to scroll *inside* it, and scroll gestures moved the hidden page overflow instead. Fixed by pinning rows: `grid-template-rows: minmax(0, 1fr)` on `.app-shell` and `.reader-layout`, `min-height: 0` on `.workspace`. Verified headlessly with an offscreen-WKWebView Swift probe against the live server: list 879px viewport / 3277px content (overflows correctly), wheel scrolls the list only, document stays at 0, layout no longer exceeds the viewport.
+
+### Phase C — stability (same session)
+The server died with every reboot/terminal close. Installed LaunchAgent `com.margin.content-reader` (RunAtLoad + KeepAlive). Lesson: launchd `WorkingDirectory` inside `~/Documents` fails with exit 78 (macOS privacy protection) — `cd` inside the `zsh -c` command instead. Verified vault read/write and library through the agent-run server.
+
+### Phase D — publishing (same session)
+Owner granted GitHub access ("upload it to my github.io repo so that it becomes public"). Machine authenticates via SSH as **IcyCrucifix**. Made the project's first git commit (private data excluded via `.gitignore`: `runtime/`, `pkcs11.txt`, caches) and pushed the source as a `margin/` folder in `icycrucifix.github.io` (a Jekyll blog; files pass through statically). Made explicit to the owner: GitHub Pages is a code mirror only — it cannot run the Python backend.
+
+### Phase E — memorable address (same session)
+Owner wanted a letter-based link. Result: **http://margin.local**. Implementation: loopback port 80 needs root on this Mac, but binding `0.0.0.0:80` is allowed unprivileged — so `scripts/margin_redirect.py` listens there, refuses non-loopback clients, and 302-redirects to `127.0.0.1:4317`; LaunchAgent `com.margin.mdns` registers the `margin.local` name via `dns-sd -P`. Verified end-to-end, README updated, public repo synced.
+
+## 8. Current state / loose ends
 
 - All requested features work and are verified: import, per-page memos, LaTeX autocomplete, live math preview, Obsidian sync, Stage-2 polish (Codex), auto-start, margin.local.
 - Ideas the owner has not requested (ask before doing): continuous scroll in the main viewer, pinch-zoom, multi-vault support, auth-protected remote hosting.
