@@ -34,6 +34,7 @@ This is the project's instruction markdown. It records the original assignment, 
 2. **Don't change features beyond what is asked.** Fix bugs, but keep behavior otherwise identical.
 3. Original lecture files and raw memos must never be modified by tooling; notes live only between the page marker comments.
 4. Never publish private data: `runtime/`, the Obsidian vault contents, and `pkcs11.txt` are gitignored and must stay out of the public repo.
+5. **Nightly polishing is note-only.** It must not modify project source code, configuration, scripts, tests, documentation, LaunchAgents, or any other completed implementation file. If a code change appears necessary, stop, notify the owner, and obtain explicit approval before editing anything.
 
 ## 4. Infrastructure set up on the owner's Mac (July 13, 2026)
 
@@ -80,7 +81,11 @@ Owner granted GitHub access ("upload it to my github.io repo so that it becomes 
 ### Phase E — memorable address (same session)
 Owner wanted a letter-based link. Result: **http://margin.local**. Implementation: loopback port 80 needs root on this Mac, but binding `0.0.0.0:80` is allowed unprivileged — so `scripts/margin_redirect.py` listens there, refuses non-loopback clients, and 302-redirects to `127.0.0.1:4317`; LaunchAgent `com.margin.mdns` registers the `margin.local` name via `dns-sd -P`. Verified end-to-end, README updated, public repo synced.
 
+### Phase F — nightly code immutability (same session)
+The owner added a hard rule that nightly polishing must never change completed project code without first notifying them and receiving explicit approval. The Stage 2 Codex subprocess is therefore rooted at the private `runtime/drafts/` directory instead of the project root, while the Obsidian vault remains its only additional writable directory. Its prompt also restricts it to creating the requested draft and invoking the deterministic finalizer. Project files remain readable for the finalizer but are not writable by the polishing subprocess.
+
 ## 8. Current state / loose ends
 
 - All requested features work and are verified: import, per-page memos, LaTeX autocomplete, live math preview, Obsidian sync, Stage-2 polish (Codex), auto-start, margin.local.
+- Nightly Stage 2 has no write access to the project source tree. Any proposed code change must be reported to the owner and approved as a separate development task.
 - Ideas the owner has not requested (ask before doing): continuous scroll in the main viewer, pinch-zoom, multi-vault support, auth-protected remote hosting.

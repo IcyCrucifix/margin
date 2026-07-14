@@ -28,6 +28,8 @@ Stage 2 hashes the source and page memos. If they are unchanged and the polished
 
 The nightly Codex automation runs the same Stage 2 pipeline for all lectures that are missing a polished note or have changed inputs. Every Stage 2 run first rescans the vault for course-code folders, moves any misplaced lecture files, and repairs the affected Obsidian links before checking whether polishing is needed.
 
+Nightly polishing is note-only. Its Codex process can write only to Margin's private draft directory and the Obsidian vault; the project source tree is read-only. Any code change requires a separate task, notice to the owner, and explicit approval.
+
 ## Obsidian layout
 
 If the vault already has a folder whose name matches the course code, Margin routes that course into `<matching course folder>/Lecture Notes/`:

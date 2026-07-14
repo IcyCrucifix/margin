@@ -5,9 +5,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from pypdf import PdfWriter
 
+from content_reader.polish import run_codex_polish
 from content_reader.store import VaultStore
 
 
@@ -120,6 +123,43 @@ class VaultStoreTest(unittest.TestCase):
         self.assertTrue((self.vault / moved["raw_note_path"]).exists())
         raw = (self.vault / moved["raw_note_path"]).read_text(encoding="utf-8")
         self.assertIn(moved["polished_note_path"][:-3], raw)
+
+    def test_stage_two_cannot_write_project_source(self) -> None:
+        record = self.store.import_document(
+            filename="safe-polish.pdf",
+            content=sample_pdf(),
+            course="CS161",
+            title="Safe Polish",
+            lecture_date="2026-07-13",
+        )
+        self.store.save_note(record["id"], 1, "A memo for the polishing job.")
+
+        captured_command: list[str] = []
+
+        def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+            captured_command.extend(command)
+            self.store.finalize_polished(
+                record["id"],
+                "## Safe result\n\nThe memo is represented.",
+                expected_hash=self.store.input_hash(record["id"]),
+            )
+            return SimpleNamespace(returncode=0)
+
+        def fake_which(executable: str) -> str:
+            return "/usr/bin/true" if executable == "codex" else "/usr/bin/python3"
+
+        with patch("content_reader.polish.shutil.which", side_effect=fake_which), patch(
+            "content_reader.polish.subprocess.run", side_effect=fake_run
+        ):
+            result = run_codex_polish(self.store, record["id"])
+
+        self.assertEqual(result["status"], "completed")
+        cd_index = captured_command.index("--cd")
+        self.assertEqual(Path(captured_command[cd_index + 1]), self.store.drafts_root)
+        self.assertIn("--add-dir", captured_command)
+        prompt = captured_command[-1]
+        self.assertIn("This is a note-polishing task only", prompt)
+        self.assertIn("editing code requires the owner's explicit approval", prompt)
 
 
 if __name__ == "__main__":

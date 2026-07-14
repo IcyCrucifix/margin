@@ -38,6 +38,8 @@ Requirements:
 6. The body should normally contain: overview and learning goals, required foundations, the taught material in logical sections, worked explanations/examples where supported, a formula/key-ideas section when relevant, and a concise review checklist.
 7. Return only the body below the title. Do not add YAML frontmatter, the H1 title, source links, or raw-note links; the finalizer adds those deterministically.
 8. Never edit or delete the original source or raw memo file.
+9. This is a note-polishing task only. Do not edit Margin project code, configuration, scripts, tests, documentation, LaunchAgents, or any other completed implementation file. If code appears to need a change, stop and report the issue; editing code requires the owner's explicit approval.
+10. The only file you may create or edit directly is the draft path below. Make all permitted vault updates only by running the deterministic finalizer command.
 
 Before installing the result, check the raw memo once more and confirm internally that every non-empty page memo is represented. Then create the UTF-8 draft at:
 {draft_path}
@@ -65,6 +67,7 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
 
     job_dir = store.runtime_root / "jobs"
     job_dir.mkdir(parents=True, exist_ok=True)
+    store.drafts_root.mkdir(parents=True, exist_ok=True)
     lock_path = job_dir / f"{document_id}.lock"
     try:
         lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -92,7 +95,7 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
         "--sandbox",
         "workspace-write",
         "--cd",
-        str(PROJECT_ROOT),
+        str(store.drafts_root),
         "--add-dir",
         str(store.vault),
         "--output-last-message",
