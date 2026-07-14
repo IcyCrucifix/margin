@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#14213a" />
     <title>Margin — Lecture Notes</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/styles.css?v=20260714-public2" />
+    <link rel="stylesheet" href="/styles.css?v=20260714-public3" />
     <script src="/editor-bundle.js" defer></script>
-    <script src="/app.js?v=20260714-public2" defer></script>
+    <script src="/app.js?v=20260714-public3" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -93,10 +93,15 @@
           <div class="page-stage" id="pageStage" tabindex="0" aria-label="Lecture page viewer. Use left and right arrows to change pages." aria-keyshortcuts="ArrowLeft ArrowRight">
             <div class="stage-toolbar">
               <span id="pageKindLabel">PAGE 1</span>
-              <div class="zoom-controls" aria-label="Page zoom">
-                <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
-                <span id="zoomLabel">100%</span>
-                <button id="zoomIn" type="button" aria-label="Zoom in">＋</button>
+              <div class="stage-toolbar-actions">
+                <button class="reload-file-button" id="reloadFileButton" type="button" title="Retry this file without changing its page notes">
+                  <span aria-hidden="true">↻</span> Reload file
+                </button>
+                <div class="zoom-controls" aria-label="Page zoom">
+                  <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+                  <span id="zoomLabel">100%</span>
+                  <button id="zoomIn" type="button" aria-label="Zoom in">＋</button>
+                </div>
               </div>
             </div>
             <div class="page-canvas" id="pageCanvas">

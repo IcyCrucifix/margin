@@ -160,6 +160,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 .page-stage { display: grid; min-width: 0; min-height: 0; grid-template-rows: 42px minmax(0, 1fr); background: #dad7d0; outline: 0; }
 .page-stage:focus-visible { box-shadow: inset 0 0 0 3px rgba(239,109,76,.32); }
 .stage-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid #cbc6bb; background: #e9e6df; color: #727a7c; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.stage-toolbar-actions { display: flex; align-items: center; gap: 7px; }
+.reload-file-button { display: flex; height: 27px; align-items: center; gap: 5px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #657078; font: inherit; letter-spacing: .04em; cursor: pointer; }
+.reload-file-button span { font-size: 14px; line-height: 1; }
+.reload-file-button:hover:not(:disabled) { background: rgba(255,255,255,.7); color: var(--ink); }
+.reload-file-button:disabled { cursor: wait; opacity: .5; }
 .zoom-controls { display: flex; align-items: center; gap: 4px; }
 .zoom-controls button { display: grid; width: 26px; height: 25px; place-items: center; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
 .zoom-controls button:hover { background: rgba(255,255,255,.7); }

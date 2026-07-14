@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unicodedata
@@ -31,6 +32,30 @@ def _safe_segment(value: str, fallback: str) -> str:
 
 def _json_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
+
+
+def _find_executable(name: str) -> str | None:
+    discovered = shutil.which(name)
+    if discovered:
+        return discovered
+
+    candidates = [
+        Path("/opt/homebrew/bin") / name,
+        Path("/usr/local/bin") / name,
+    ]
+    interpreter = Path(sys.executable).resolve()
+    if len(interpreter.parents) > 2:
+        runtime_root = interpreter.parents[2]
+        candidates.extend(
+            [
+                runtime_root / "bin" / "override" / name,
+                runtime_root / "bin" / "fallback" / name,
+            ]
+        )
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -533,7 +558,7 @@ class VaultStore:
         if final_path.exists():
             return final_path
 
-        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        soffice = _find_executable("soffice") or _find_executable("libreoffice")
         if not soffice:
             return None
         process = subprocess.run(
@@ -810,35 +835,42 @@ class VaultStore:
         cache_dir = self.page_cache_root / document_id
         cache_dir.mkdir(parents=True, exist_ok=True)
         page_path = cache_dir / f"page-{page_number:04d}-{cache_label}.png"
-        if page_path.exists():
+        if page_path.exists() and page_path.stat().st_size:
             return page_path
+
+        legacy_page_path = cache_dir / f"page-{page_number:04d}.png"
+        if (
+            resolution >= 60
+            and legacy_page_path.exists()
+            and legacy_page_path.stat().st_size
+        ):
+            return legacy_page_path
 
         pdf_path = record.get("rendered_pdf_path")
         if pdf_path and Path(pdf_path).exists():
-            pdftoppm = shutil.which("pdftoppm")
-            if not pdftoppm:
-                raise StoreError("PDF page renderer is unavailable.")
-            prefix = cache_dir / f"page-{page_number:04d}-{cache_label}"
-            process = subprocess.run(
-                [
-                    pdftoppm,
-                    "-f",
-                    str(page_number),
-                    "-l",
-                    str(page_number),
-                    "-singlefile",
-                    "-png",
-                    "-r",
-                    str(resolution),
-                    str(pdf_path),
-                    str(prefix),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if process.returncode == 0 and page_path.exists():
-                return page_path
+            pdftoppm = _find_executable("pdftoppm")
+            if pdftoppm:
+                prefix = cache_dir / f"page-{page_number:04d}-{cache_label}"
+                process = subprocess.run(
+                    [
+                        pdftoppm,
+                        "-f",
+                        str(page_number),
+                        "-l",
+                        str(page_number),
+                        "-singlefile",
+                        "-png",
+                        "-r",
+                        str(resolution),
+                        str(pdf_path),
+                        str(prefix),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if process.returncode == 0 and page_path.exists():
+                    return page_path
 
         thumbnail = resolution < 60
         return self._render_text_fallback(
@@ -868,7 +900,7 @@ class VaultStore:
             rf"^## Page {page_number}\n\n(.*?)(?=\n## Page |\Z)", re.MULTILINE | re.DOTALL
         )
         match = pattern.search(extracted)
-        text = (match.group(1).strip() if match else "No extractable slide text.")
+        text = match.group(1).strip() if match else "No extractable page text."
         width, height = size
         scale = width / 1600
         image = Image.new("RGB", size, "#f7f4ed")
@@ -884,7 +916,8 @@ class VaultStore:
         )
         draw.text(
             (round(95 * scale), round(90 * scale)),
-            f"{record['title']} · Slide {page_number}",
+            f"{record['title']} · "
+            f"{'Page' if record['kind'] == 'pdf' else 'Slide'} {page_number}",
             fill="#16233a",
             font=title_font,
         )

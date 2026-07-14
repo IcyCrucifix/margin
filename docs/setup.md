@@ -13,7 +13,7 @@ Margin is a local Python server plus a browser front end. It does not require cl
 | Obsidian | optional vault integration only | [obsidian.md](https://obsidian.md) |
 | A local AI agent | optional Stage 2 polishing only | see [polish.md](polish.md) |
 
-Without LibreOffice, PowerPoint pages display as text placeholders and notes still work. Node/pnpm are only needed when editing `web/editor-source.js`; the browser bundle is already built.
+Without Poppler, PDF pages display as readable text placeholders; without LibreOffice, PowerPoint pages do the same. Page-linked notes still work in both cases. Node/pnpm are only needed when editing `web/editor-source.js`; the browser bundle is already built.
 
 ## Choose storage
 

@@ -124,6 +124,26 @@ class VaultStoreTest(unittest.TestCase):
         raw = (self.vault / moved["raw_note_path"]).read_text(encoding="utf-8")
         self.assertIn(moved["polished_note_path"][:-3], raw)
 
+    def test_pdf_without_renderer_uses_fallback_and_keeps_page_notes(self) -> None:
+        record = self.store.import_document(
+            filename="renderer-fallback.pdf",
+            content=sample_pdf(2),
+            course="MATH1853",
+            title="Renderer fallback",
+            lecture_date="2026-07-14",
+        )
+        self.store.save_note(record["id"], 2, "This memo must remain on page two.")
+
+        with patch("content_reader.store._find_executable", return_value=None):
+            rendered = self.store.render_page(record["id"], 2)
+
+        self.assertTrue(rendered.exists())
+        self.assertGreater(rendered.stat().st_size, 100)
+        self.assertEqual(
+            self.store.get_notes(record["id"])["2"],
+            "This memo must remain on page two.",
+        )
+
     def test_same_filename_reupload_inherits_and_shares_page_notes(self) -> None:
         first = self.store.import_document(
             filename="COMP2112 Lec22.pdf",

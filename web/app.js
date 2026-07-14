@@ -12,6 +12,7 @@ const state = {
   health: null,
   loadingTimer: null,
   preloadedPages: new Set(),
+  renderRevision: 0,
   editor: null,
   polishPrompts: null,
   polishPromptScope: "selected",
@@ -27,7 +28,7 @@ const elements = {
   pageCounter: $("#pageCounter"), currentPageLabel: $("#currentPageLabel"), totalPagesLabel: $("#totalPagesLabel"),
   previousPage: $("#previousPage"), nextPage: $("#nextPage"), polishButton: $("#polishButton"),
   emptyState: $("#emptyState"), readerLayout: $("#readerLayout"), pageList: $("#pageList"),
-  pageKindLabel: $("#pageKindLabel"), pageStrip: $(".page-strip"), pageStage: $("#pageStage"), pageCanvas: $("#pageCanvas"),
+  pageKindLabel: $("#pageKindLabel"), reloadFileButton: $("#reloadFileButton"), pageStrip: $(".page-strip"), pageStage: $("#pageStage"), pageCanvas: $("#pageCanvas"),
   pageImage: $("#pageImage"), pageLoading: $("#pageLoading"),
   zoomOut: $("#zoomOut"), zoomIn: $("#zoomIn"), zoomLabel: $("#zoomLabel"),
   memoTitle: $("#memoTitle"), saveState: $("#saveState"), noteEditor: $("#noteEditor"),
@@ -208,11 +209,11 @@ function updateCurrentPageNoteDot() {
 }
 
 function pageImageUrl(page) {
-  return `/api/doc/${state.active.id}/page/${page}`;
+  return `/api/doc/${state.active.id}/page/${page}?reload=${state.renderRevision}`;
 }
 
 function thumbnailImageUrl(page) {
-  return `/api/doc/${state.active.id}/thumbnail/${page}`;
+  return `/api/doc/${state.active.id}/thumbnail/${page}?reload=${state.renderRevision}`;
 }
 
 function preloadNearbyPages(page) {
@@ -228,7 +229,7 @@ function preloadNearbyPages(page) {
       const image = new Image();
       image.decoding = "async";
       image.fetchPriority = "low";
-      image.src = `/api/doc/${documentId}/page/${candidate}`;
+      image.src = `/api/doc/${documentId}/page/${candidate}?reload=${state.renderRevision}`;
     });
   };
   if ("requestIdleCallback" in window) window.requestIdleCallback(preload, { timeout: 400 });
@@ -260,12 +261,29 @@ function renderPage() {
   };
   elements.pageImage.onerror = () => {
     clearTimeout(state.loadingTimer);
-    elements.pageLoading.textContent = "Could not render this page.";
+    elements.pageLoading.textContent = "Could not render this page. Use Reload file to retry.";
     elements.pageLoading.hidden = false;
   };
   state.loadingTimer = setTimeout(() => { elements.pageLoading.hidden = false; }, 140);
   elements.pageImage.src = pageImageUrl(page);
   updatePageListState();
+}
+
+async function reloadFile() {
+  if (!state.active) return;
+  const currentValue = state.editor?.getValue() || "";
+  await saveNow();
+  if (state.savedValue !== currentValue) {
+    showToast("The file was not reloaded because the current page memo could not be saved.", true, 6500);
+    return;
+  }
+  elements.reloadFileButton.disabled = true;
+  state.renderRevision = Date.now();
+  state.preloadedPages.clear();
+  renderPageList();
+  renderPage();
+  elements.reloadFileButton.disabled = false;
+  showToast("File reloaded. Page notes stayed assigned.");
 }
 
 async function goToPage(page) {
@@ -555,6 +573,7 @@ elements.vaultStatusCard.addEventListener("click", checkVaultConnection);
 elements.polishPendingButton.addEventListener("click", () => openPolishOptions("pending"));
 elements.previousPage.addEventListener("click", () => goToPage(state.page - 1));
 elements.nextPage.addEventListener("click", () => goToPage(state.page + 1));
+elements.reloadFileButton.addEventListener("click", reloadFile);
 elements.zoomOut.addEventListener("click", () => { state.zoom = Math.max(.5, state.zoom - .1); applyZoom(); });
 elements.zoomIn.addEventListener("click", () => { state.zoom = Math.min(2, state.zoom + .1); applyZoom(); });
 elements.polishButton.addEventListener("click", () => openPolishOptions("selected"));

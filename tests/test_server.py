@@ -84,6 +84,8 @@ class ServerIntegrationTest(unittest.TestCase):
         )
         notes = self.request(f"/api/doc/{document['id']}/notes")["notes"]
         self.assertIn("\\sqrt", notes["1"])
+        shell = self.request("/")
+        self.assertIn(b'id="reloadFileButton"', shell)
         prompts = self.request(
             f"/api/polish/prompts?scope=selected&document_id={document['id']}"
         )
@@ -92,6 +94,10 @@ class ServerIntegrationTest(unittest.TestCase):
         self.assertIn("available", prompts["runner"])
         image = self.request(f"/api/doc/{document['id']}/page/1")
         self.assertTrue(image.startswith(b"\x89PNG"))
+        reloaded_image = self.request(f"/api/doc/{document['id']}/page/1?reload=123")
+        self.assertTrue(reloaded_image.startswith(b"\x89PNG"))
+        reloaded_notes = self.request(f"/api/doc/{document['id']}/notes")["notes"]
+        self.assertEqual(reloaded_notes["1"], notes["1"])
         thumbnail = self.request(f"/api/doc/{document['id']}/thumbnail/1")
         self.assertTrue(thumbnail.startswith(b"\x89PNG"))
         self.assertLess(len(thumbnail), len(image))
