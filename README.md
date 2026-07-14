@@ -1,4 +1,4 @@
-# Margin — Content Reader + Notes
+# Margin: Content reader with a built-in notes system
 
 Margin is a local browser workspace for page-linked lecture notes. It opens PDF and PowerPoint files, keeps Markdown/LaTeX memos matched to their exact pages, and can turn the source plus those memos into polished notes later.
 
@@ -45,9 +45,9 @@ Re-uploading a revised file under the same filename carries the earlier page mem
 
 Margin provides three entry points to the same guarded pipeline:
 
-- **Polish now** — process the selected lecture.
-- **Polish pending** — process every missing or stale polished note, one at a time.
-- **Optional daily schedule** — enable `auto_polish` in `config.json`; Margin runs the pending queue while its local server is running.
+- **Polish now**: process the selected lecture.
+- **Polish pending**: process every missing or stale polished note, one at a time.
+- **Optional daily schedule**: enable `auto_polish` in `config.json`; Margin runs the pending queue while its local server is running.
 
 Pressing a Stage 2 action opens simple options. If a signed-in Codex CLI or configured AI command is ready, Margin can run directly. Otherwise, Margin explains that direct polishing is unavailable and offers one-click buttons to copy a hidden one-time polishing prompt or a hidden nightly-automation template into the user's own AI system. Users never need to open the Python source to obtain either prompt.
 
