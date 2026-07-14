@@ -44,9 +44,9 @@ Notes autosave. Each memo lives between stable page markers in a separate Markdo
 
 Margin provides three entry points to the same guarded pipeline:
 
-- **Polish now** — process the selected lecture.
-- **Polish pending** — process every missing or stale polished note, one at a time.
-- **Optional daily schedule** — enable `auto_polish` in `config.json`; Margin runs the pending queue while its local server is running.
+- **Polish now**: process the selected lecture.
+- **Polish pending**: process every missing or stale polished note, one at a time.
+- **Optional daily schedule**: enable `auto_polish` in `config.json`; Margin runs the pending queue while its local server is running.
 
 Pressing a Stage 2 action opens simple options. If a signed-in Codex CLI or configured AI command is ready, Margin can run directly. Otherwise, Margin explains that direct polishing is unavailable and offers one-click buttons to copy a hidden one-time polishing prompt or a hidden nightly-automation template into the user's own AI system. Users never need to open the Python source to obtain either prompt.
 
