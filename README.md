@@ -2,6 +2,8 @@
 
 Margin is a local browser workspace for page-linked lecture notes. It opens PDF and PowerPoint files, keeps Markdown/LaTeX memos matched to their exact pages, and can turn the source plus those memos into polished notes later.
 
+Use Margin during class by opening a PDF or PowerPoint and writing a separate Markdown/LaTeX memo for each page or slide; every memo stays matched to its source page without altering the original file. For formulas, type `\` followed by a symbol name—such as `\omega`—to choose from lowercase and uppercase suggestions like `\omega` and `\Omega`, or simply keep typing to dismiss them. After class, Stage 2 can combine the lecture and your memos into polished notes.
+
 Obsidian is optional. Margin can store notes in either:
 
 - any ordinary local folder, using portable Markdown links; or
