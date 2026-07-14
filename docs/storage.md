@@ -28,6 +28,11 @@ The library also contains:
 - `Lecture Notes Hub.md` — human-facing course index with links appropriate to the selected mode.
 
 Re-importing the same course, title, and source bytes returns the existing record.
+If the bytes differ but the uploaded filename is the same (case-insensitive), the
+new record keeps its own source and raw-note files while inheriting the existing
+page memos. Editing a page memo from any matching upload mirrors that page into
+every same-named upload that contains it; extra pages on a longer version remain
+attached only to versions that contain those pages.
 
 ## Raw-note marker contract
 

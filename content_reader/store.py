@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import textwrap
+import unicodedata
 import urllib.parse
 from datetime import date, datetime
 from pathlib import Path
@@ -211,6 +212,46 @@ class VaultStore:
                 return document
         raise StoreError("Lecture not found.")
 
+    @staticmethod
+    def _filename_key(filename: Any) -> str:
+        if not isinstance(filename, str):
+            return ""
+        basename = filename.replace("\\", "/").rsplit("/", 1)[-1]
+        return unicodedata.normalize("NFC", basename).casefold()
+
+    def _same_filename_documents(
+        self, documents: list[dict[str, Any]], filename: str
+    ) -> list[dict[str, Any]]:
+        filename_key = self._filename_key(filename)
+        if not filename_key:
+            return []
+        return [
+            document
+            for document in documents
+            if self._filename_key(document.get("filename")) == filename_key
+        ]
+
+    def _unique_note_path(
+        self,
+        relative: Path,
+        *,
+        document_id: str,
+        occupied_paths: set[str],
+    ) -> Path:
+        if relative.as_posix() not in occupied_paths and not (self.vault / relative).exists():
+            return relative
+
+        candidate = relative.with_name(
+            f"{relative.stem} - {document_id[:6]}{relative.suffix}"
+        )
+        counter = 2
+        while candidate.as_posix() in occupied_paths or (self.vault / candidate).exists():
+            candidate = relative.with_name(
+                f"{relative.stem} - {document_id[:6]}-{counter}{relative.suffix}"
+            )
+            counter += 1
+        return candidate
+
     def import_document(
         self,
         *,
@@ -243,6 +284,10 @@ class VaultStore:
         for existing in library["documents"]:
             if existing["id"] == document_id:
                 return existing
+        same_filename_documents = self._same_filename_documents(
+            library["documents"], filename
+        )
+        shared_notes = self._shared_notes(same_filename_documents)
 
         course_destination = self._course_destination(course)
         source_filename = f"{lecture_date} - {title} - {document_id[:6]}{suffix}"
@@ -266,6 +311,21 @@ class VaultStore:
         else:
             raw_relative = lecture_root / "Raw" / course / raw_filename
             polished_relative = lecture_root / "Polished" / course / polished_filename
+        raw_relative = self._unique_note_path(
+            raw_relative,
+            document_id=document_id,
+            occupied_paths={
+                document.get("raw_note_path", "") for document in library["documents"]
+            },
+        )
+        polished_relative = self._unique_note_path(
+            polished_relative,
+            document_id=document_id,
+            occupied_paths={
+                document.get("polished_note_path", "")
+                for document in library["documents"]
+            },
+        )
         extracted_relative = (
             Path(self.notes_root_name)
             / ".content-reader"
@@ -292,7 +352,11 @@ class VaultStore:
             "updated_at": _now_iso(),
         }
 
-        _atomic_write_text(self.vault / raw_relative, self._raw_note_template(record))
+        raw_note = self._raw_note_template(record)
+        for page_number, note in shared_notes.items():
+            if page_number <= page_count:
+                raw_note = self._replace_page_note(raw_note, page_number, note)
+        _atomic_write_text(self.vault / raw_relative, raw_note)
         _atomic_write_text(
             self.vault / extracted_relative,
             self._extracted_note_template(record, page_text),
@@ -623,8 +687,7 @@ class VaultStore:
             return f"> [!{kind}] {title}"
         return f"> **{title}**"
 
-    def get_notes(self, document_id: str) -> dict[str, str]:
-        record = self.get_document(document_id)
+    def _notes_for_record(self, record: dict[str, Any]) -> dict[str, str]:
         raw_path = self.vault / record["raw_note_path"]
         text = raw_path.read_text(encoding="utf-8")
         notes: dict[str, str] = {}
@@ -637,16 +700,29 @@ class VaultStore:
             notes[str(page_number)] = match.group(1).strip("\n") if match else ""
         return notes
 
-    def save_note(self, document_id: str, page_number: int, content: str) -> dict[str, Any]:
-        record = self.get_document(document_id)
-        if page_number < 1 or page_number > record["page_count"]:
-            raise StoreError("Page number is outside this lecture.")
-        content = content.replace("\r\n", "\n").replace("\r", "\n").rstrip()
-        if "<!-- content-reader:" in content:
-            raise StoreError("That marker is reserved for page synchronization.")
+    def _shared_notes(self, records: list[dict[str, Any]]) -> dict[int, str]:
+        shared: dict[int, str] = {}
+        newest_first = sorted(
+            records,
+            key=lambda record: (
+                record.get("updated_at", ""),
+                record.get("imported_at", ""),
+            ),
+            reverse=True,
+        )
+        for record in newest_first:
+            try:
+                notes = self._notes_for_record(record)
+            except OSError:
+                continue
+            for page, content in notes.items():
+                page_number = int(page)
+                if page_number not in shared and content.strip():
+                    shared[page_number] = content
+        return shared
 
-        raw_path = self.vault / record["raw_note_path"]
-        text = raw_path.read_text(encoding="utf-8")
+    @staticmethod
+    def _replace_page_note(text: str, page_number: int, content: str) -> str:
         pattern = re.compile(
             rf"(<!-- content-reader:page:{page_number}:start -->)\n.*?\n(<!-- content-reader:page:{page_number}:end -->)",
             re.DOTALL,
@@ -658,16 +734,55 @@ class VaultStore:
         )
         if count != 1:
             raise StoreError("The raw note page marker is missing or duplicated.")
-        _atomic_write_text(raw_path, updated)
+        return updated
+
+    def get_notes(self, document_id: str) -> dict[str, str]:
+        return self._notes_for_record(self.get_document(document_id))
+
+    def save_note(self, document_id: str, page_number: int, content: str) -> dict[str, Any]:
+        record = self.get_document(document_id)
+        if page_number < 1 or page_number > record["page_count"]:
+            raise StoreError("Page number is outside this lecture.")
+        content = content.replace("\r\n", "\n").replace("\r", "\n").rstrip()
+        if "<!-- content-reader:" in content:
+            raise StoreError("That marker is reserved for page synchronization.")
 
         library = self._load_library()
+        matching_documents = self._same_filename_documents(
+            library["documents"], record.get("filename", "")
+        )
+        if not matching_documents:
+            matching_documents = [record]
+        matching_documents = [
+            document
+            for document in matching_documents
+            if page_number <= document["page_count"]
+        ]
+
+        pending_writes: dict[Path, str] = {}
+        for document in matching_documents:
+            raw_path = self.vault / document["raw_note_path"]
+            text = pending_writes.get(raw_path)
+            if text is None:
+                text = raw_path.read_text(encoding="utf-8")
+            pending_writes[raw_path] = self._replace_page_note(
+                text, page_number, content
+            )
+        for raw_path, updated in pending_writes.items():
+            _atomic_write_text(raw_path, updated)
+
+        saved_at = _now_iso()
+        matching_ids = {document["id"] for document in matching_documents}
         for document in library["documents"]:
-            if document["id"] == document_id:
-                document["updated_at"] = _now_iso()
-                break
+            if document["id"] in matching_ids:
+                document["updated_at"] = saved_at
         self._save_library(library)
         self.write_hub(library["documents"])
-        return {"saved_at": _now_iso(), "has_notes": bool(content.strip())}
+        return {
+            "saved_at": saved_at,
+            "has_notes": bool(content.strip()),
+            "shared_document_count": len(matching_documents),
+        }
 
     def _document_has_notes(self, record: dict[str, Any]) -> bool:
         try:

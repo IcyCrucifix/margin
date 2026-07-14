@@ -124,6 +124,59 @@ class VaultStoreTest(unittest.TestCase):
         raw = (self.vault / moved["raw_note_path"]).read_text(encoding="utf-8")
         self.assertIn(moved["polished_note_path"][:-3], raw)
 
+    def test_same_filename_reupload_inherits_and_shares_page_notes(self) -> None:
+        first = self.store.import_document(
+            filename="COMP2112 Lec22.pdf",
+            content=sample_pdf(2),
+            course="COMP2112",
+            title="Lecture 22",
+            lecture_date="2026-07-13",
+        )
+        self.store.save_note(first["id"], 1, "The original page-one memo.")
+
+        reuploaded = self.store.import_document(
+            filename="COMP2112 Lec22.pdf",
+            content=sample_pdf(3),
+            course="COMP2112",
+            title="Lecture 22",
+            lecture_date="2026-07-13",
+        )
+
+        self.assertNotEqual(reuploaded["id"], first["id"])
+        self.assertNotEqual(reuploaded["raw_note_path"], first["raw_note_path"])
+        self.assertNotEqual(
+            reuploaded["polished_note_path"], first["polished_note_path"]
+        )
+        self.assertTrue((self.vault / first["raw_note_path"]).exists())
+        self.assertTrue((self.vault / reuploaded["raw_note_path"]).exists())
+        self.assertEqual(
+            self.store.get_notes(reuploaded["id"])["1"],
+            "The original page-one memo.",
+        )
+
+        saved = self.store.save_note(
+            reuploaded["id"], 1, "An edit made from the re-uploaded file."
+        )
+        self.assertEqual(saved["shared_document_count"], 2)
+        self.assertEqual(
+            self.store.get_notes(first["id"])["1"],
+            "An edit made from the re-uploaded file.",
+        )
+        self.assertEqual(
+            self.store.get_notes(reuploaded["id"])["1"],
+            "An edit made from the re-uploaded file.",
+        )
+
+        page_three = self.store.save_note(
+            reuploaded["id"], 3, "Only uploads with page three receive this memo."
+        )
+        self.assertEqual(page_three["shared_document_count"], 1)
+        self.assertNotIn("3", self.store.get_notes(first["id"]))
+        self.assertEqual(
+            self.store.get_notes(reuploaded["id"])["3"],
+            "Only uploads with page three receive this memo.",
+        )
+
     def test_stage_two_cannot_write_project_source(self) -> None:
         record = self.store.import_document(
             filename="safe-polish.pdf",

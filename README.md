@@ -39,6 +39,7 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 5. Type `\` followed by a symbol name for LaTeX suggestions such as `\omega` and `\Omega`.
 
 Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains untouched.
+Re-uploading a revised file under the same filename carries the earlier page memos into the new copy, and edits remain shared across every same-named upload.
 
 ## Stage 2: polish manually or automatically
 
