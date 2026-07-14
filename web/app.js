@@ -26,7 +26,7 @@ const elements = {
   vaultStatusCard: $("#vaultStatusCard"), vaultStatusText: $("#vaultStatusText"), vaultLabel: $("#vaultLabel"),
   vaultProof: $("#vaultProof"), courseLabel: $("#courseLabel"), documentTitle: $("#documentTitle"),
   pageCounter: $("#pageCounter"), currentPageLabel: $("#currentPageLabel"), totalPagesLabel: $("#totalPagesLabel"),
-  previousPage: $("#previousPage"), nextPage: $("#nextPage"), polishButton: $("#polishButton"),
+  previousPage: $("#previousPage"), nextPage: $("#nextPage"), polishButton: $("#polishButton"), shortcutHelpButton: $("#shortcutHelpButton"),
   emptyState: $("#emptyState"), readerLayout: $("#readerLayout"), pageList: $("#pageList"),
   pageKindLabel: $("#pageKindLabel"), reloadFileButton: $("#reloadFileButton"), pageStrip: $(".page-strip"), pageStage: $("#pageStage"), pageCanvas: $("#pageCanvas"),
   pageImage: $("#pageImage"), pageLoading: $("#pageLoading"),
@@ -39,7 +39,7 @@ const elements = {
   polishDialog: $("#polishDialog"), polishDialogTitle: $("#polishDialogTitle"),
   polishAvailabilityMessage: $("#polishAvailabilityMessage"), polishRunnerReason: $("#polishRunnerReason"),
   directPolishButton: $("#directPolishButton"), copyManualPromptButton: $("#copyManualPromptButton"),
-  copyNightlyPromptButton: $("#copyNightlyPromptButton"),
+  copyNightlyPromptButton: $("#copyNightlyPromptButton"), shortcutsDialog: $("#shortcutsDialog"),
 };
 
 async function api(path, options = {}) {
@@ -60,6 +60,15 @@ function showToast(message, error = false, duration = 4200) {
   elements.toast.hidden = false;
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => { elements.toast.hidden = true; }, duration);
+}
+
+function isEditingTarget(target) {
+  return target instanceof HTMLElement
+    && Boolean(target.closest("textarea, input, [contenteditable='true'], .cm-editor"));
+}
+
+function openShortcutHelp() {
+  if (!elements.shortcutsDialog.open) elements.shortcutsDialog.showModal();
 }
 
 async function loadLibrary(preferredId = null) {
@@ -573,6 +582,7 @@ elements.vaultStatusCard.addEventListener("click", checkVaultConnection);
 elements.polishPendingButton.addEventListener("click", () => openPolishOptions("pending"));
 elements.previousPage.addEventListener("click", () => goToPage(state.page - 1));
 elements.nextPage.addEventListener("click", () => goToPage(state.page + 1));
+elements.shortcutHelpButton.addEventListener("click", openShortcutHelp);
 elements.reloadFileButton.addEventListener("click", reloadFile);
 elements.zoomOut.addEventListener("click", () => { state.zoom = Math.max(.5, state.zoom - .1); applyZoom(); });
 elements.zoomIn.addEventListener("click", () => { state.zoom = Math.min(2, state.zoom + .1); applyZoom(); });
@@ -596,12 +606,22 @@ elements.pageStrip.addEventListener("wheel", (event) => {
 }, { passive: false });
 document.querySelectorAll(".format-bar button").forEach((button) => button.addEventListener("click", () => formatSelection(button)));
 window.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !elements.shortcutsDialog.open) return;
+  event.preventDefault();
+  elements.shortcutsDialog.close();
+}, { capture: true });
+window.addEventListener("keydown", (event) => {
+  if (event.key !== "?" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isEditingTarget(event.target)) return;
+  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open) return;
+  event.preventDefault();
+  openShortcutHelp();
+}, { capture: true });
+window.addEventListener("keydown", (event) => {
   if (!state.active || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-  if (elements.importDialog.open || elements.polishDialog.open) return;
+  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open) return;
   if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-  const target = event.target;
-  const isEditing = target instanceof HTMLElement && Boolean(target.closest("textarea, input, [contenteditable='true'], .cm-editor"));
-  if (isEditing) return;
+  if (isEditingTarget(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
   goToPage(state.page + (event.key === "ArrowRight" ? 1 : -1));

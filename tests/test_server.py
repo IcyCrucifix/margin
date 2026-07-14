@@ -86,6 +86,10 @@ class ServerIntegrationTest(unittest.TestCase):
         self.assertIn("\\sqrt", notes["1"])
         shell = self.request("/")
         self.assertIn(b'id="reloadFileButton"', shell)
+        self.assertIn(b'id="shortcutHelpButton"', shell)
+        self.assertIn(b">Keyboard Shortcuts</span>", shell)
+        self.assertIn(b'id="shortcutsDialog"', shell)
+        self.assertIn(b"Keyboard shortcuts", shell)
         prompts = self.request(
             f"/api/polish/prompts?scope=selected&document_id={document['id']}"
         )

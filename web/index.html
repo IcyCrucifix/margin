@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#14213a" />
     <title>Margin — Lecture Notes</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/styles.css?v=20260714-public3" />
+    <link rel="stylesheet" href="/styles.css?v=20260714-public4" />
     <script src="/editor-bundle.js" defer></script>
-    <script src="/app.js?v=20260714-public3" defer></script>
+    <script src="/app.js?v=20260714-public4" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -65,6 +65,9 @@
               <span><strong id="currentPageLabel">1</strong> / <span id="totalPagesLabel">1</span></span>
               <button id="nextPage" type="button" aria-label="Next page">→</button>
             </div>
+            <button class="shortcut-button" id="shortcutHelpButton" type="button" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-controls="shortcutsDialog" aria-keyshortcuts="?">
+              <span>Keyboard Shortcuts</span>
+            </button>
             <button class="stage-button" id="polishButton" type="button" disabled>
               <span class="stage-icon" aria-hidden="true">✦</span>
               <span><small>STAGE 2</small>Polish now</span>
@@ -200,6 +203,40 @@
         </div>
 
         <p class="dialog-footnote">Prompt contents stay hidden in Margin and are copied only when you press a copy button.</p>
+      </form>
+    </dialog>
+
+    <dialog class="shortcuts-dialog" id="shortcutsDialog" aria-labelledby="shortcutsDialogTitle">
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">QUICK REFERENCE</span>
+            <h2 id="shortcutsDialogTitle">Keyboard shortcuts</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close keyboard shortcuts">×</button>
+        </div>
+        <dl class="shortcut-list">
+          <div>
+            <dt><kbd>←</kbd><kbd>→</kbd></dt>
+            <dd>Move between lecture pages when the memo editor is not focused.</dd>
+          </div>
+          <div>
+            <dt><kbd>⌘</kbd><kbd>S</kbd><span>or</span><kbd>Ctrl</kbd><kbd>S</kbd></dt>
+            <dd>Save the memo assigned to the current page.</dd>
+          </div>
+          <div>
+            <dt><kbd>\</kbd></dt>
+            <dd>Show LaTeX symbol suggestions while writing a memo.</dd>
+          </div>
+          <div>
+            <dt><kbd>?</kbd></dt>
+            <dd>Open this keyboard shortcut list.</dd>
+          </div>
+          <div>
+            <dt><kbd>Esc</kbd></dt>
+            <dd>Close the keyboard shortcut list.</dd>
+          </div>
+        </dl>
       </form>
     </dialog>
 

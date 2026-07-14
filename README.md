@@ -41,6 +41,7 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains untouched.
 Re-uploading a revised file under the same filename carries the earlier page memos into the new copy, and edits remain shared across every same-named upload.
 If a page or slide does not render, choose **Reload file** in the viewer toolbar. Margin retries the lecture images without re-importing the source or changing which memo belongs to each page.
+Choose **Shortcuts** in the top toolbar, or press `?` outside the memo editor, to display the keyboard shortcut list.
 
 ## Stage 2: polish manually or automatically
 
