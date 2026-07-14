@@ -9,7 +9,7 @@ Obsidian is optional. Margin can store notes in either:
 
 The source file is always copied byte-for-byte and never edited. Everything stays on the user's machine.
 
-## Quick start — no Obsidian required
+## Quick start
 
 ```bash
 cp config.example.json config.json
@@ -25,6 +25,8 @@ cp config.obsidian.example.json config.json
 ```
 
 See [docs/setup.md](docs/setup.md) for dependencies, configuration, and auto-start.
+
+See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for the system.
 
 ## Stage 1 — take page-linked notes
 
