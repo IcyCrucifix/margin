@@ -50,7 +50,9 @@ Python used everywhere: `~/.cache/codex-runtimes/codex-primary-runtime/dependenc
 
 ## 5. Publishing
 
-Source is public at `github.com/IcyCrucifix/icycrucifix.github.io` under `margin/` (SSH auth as IcyCrucifix works from this machine). It is a **code mirror only** — GitHub Pages cannot run the Python server. Sync procedure: commit locally here, then shallow-clone the site repo, `rm -rf margin`, `git archive HEAD | tar -x -C <clone>/margin`, commit, push.
+The canonical public repository is `github.com/IcyCrucifix/margin`. This checkout uses `origin` → `git@github.com:IcyCrucifix/margin.git`, and local `main` tracks `origin/main`. Publish committed changes directly with `git push origin main`.
+
+The former `icycrucifix.github.io/margin` code mirror is retired and must not be updated. GitHub Pages is not used because it cannot run Margin's local Python server.
 
 ## 6. Hard-won lessons from the previous session
 
@@ -90,6 +92,9 @@ Owner request: make the repo publishable to their GitHub account for users with 
 1. **Genericized identity, not behavior.** `config.json` (personal vault path) untracked and gitignored; `config.example.json` added with a placeholder path; the missing-config error now points at it. `start.command` uses `$HOME` instead of a hard-coded user path (it already fell back to system `python3` on other machines). The two `HKU_Obsidian` strings in `web/index.html` became neutral placeholders (the health check overwrites the vault label at runtime anyway). Added `requirements.txt`. No Python/JS behavior changed.
 2. **Specified the two subsystems for outside users** in `docs/`: `obsidian-sync.md` (vault contract: per-lecture artifacts, `library.json`, page-marker memo format, course-code routing + reconciliation, atomicity guarantees, own-vault checklist) and `polish.md` (pipeline stages, manual vs nightly entry points via `pending_lectures.py`/`polish_pending.py` under any scheduler, the note-only safety contract, the bring-your-own-AI agent contract with Claude Code/Gemini CLI drop-in command examples, and the no-AI manual finalizer path). `docs/setup.md` covers install/config/auto-start generically. README rewritten as the generic entry point linking to all three.
 3. The BYO-AI section documents swapping the one command list in `run_codex_polish()`; the owner's own deployment keeps Codex (constraint #1 untouched).
+
+### Phase H — canonical GitHub publication (July 14, 2026)
+Created the dedicated public repository `IcyCrucifix/margin`, configured it as `origin`, and retired the old `icycrucifix.github.io/margin` mirror procedure. Before the first push, a history audit found that the owner's personal `config.json` vault path was still present in the initial commit even though the file was absent from the current tree. The six logical commits were preserved while removing `config.json` from every published revision; the final source tree remained identical. All four tests passed after sanitization, and the remote README plus all three linked documentation pages were verified through GitHub.
 
 ## 8. Current state / loose ends
 
