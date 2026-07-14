@@ -28,7 +28,7 @@ See [docs/setup.md](docs/setup.md) for dependencies, configuration, and auto-sta
 
 See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for the system.
 
-## Stage 1 — take page-linked notes
+## Stage 1: take page-linked notes
 
 1. Choose **Open lecture** and select a `.pdf` or `.pptx` file.
 2. Enter the course code, lecture title, and date.
@@ -38,7 +38,7 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 
 Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains untouched.
 
-## Stage 2 — polish manually or automatically
+## Stage 2: polish manually or automatically
 
 Margin provides three entry points to the same guarded pipeline:
 
