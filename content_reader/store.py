@@ -73,7 +73,10 @@ class VaultStore:
         try:
             self.config = json.loads(self.config_path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise StoreError(f"Missing configuration file: {self.config_path}") from exc
+            raise StoreError(
+                f"Missing configuration file: {self.config_path}. "
+                "Copy config.example.json to config.json and set vault_path to your Obsidian vault."
+            ) from exc
 
         self.vault = Path(self.config["vault_path"]).expanduser().resolve()
         self.notes_root_name = self.config.get("notes_root", "Lecture Notes")

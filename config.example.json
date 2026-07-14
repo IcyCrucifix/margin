@@ -1,0 +1,8 @@
+{
+  "vault_path": "~/Documents/Obsidian/My Vault",
+  "notes_root": "Lecture Notes",
+  "host": "127.0.0.1",
+  "port": 4317,
+  "route_to_existing_course_folder": true,
+  "max_upload_mb": 250
+}

@@ -23,7 +23,7 @@ This is the project's instruction markdown. It records the original assignment, 
 ## 2. Architecture (as built)
 
 - **Local web app**, no cloud. Python 3.12 stdlib HTTP server (`content_reader/server.py`) serving `web/` and a JSON API on `127.0.0.1:4317`.
-- `content_reader/store.py` — vault storage: imports PDF/PPTX byte-for-byte into the Obsidian vault (`config.json` → `/Users/icycrucifix/Desktop/HKU/HKU_Obsidian`), extracts page text (pypdf / python-pptx), renders page images with `pdftoppm` (PPTX converted via LibreOffice `soffice`), and keeps page-linked memos inside `... - Raw Notes.md` between `<!-- content-reader:page:N:start/end -->` markers.
+- `content_reader/store.py` — vault storage: imports PDF/PPTX byte-for-byte into the Obsidian vault (`config.json` → the owner's `HKU_Obsidian` vault; the file is untracked, users copy `config.example.json`), extracts page text (pypdf / python-pptx), renders page images with `pdftoppm` (PPTX converted via LibreOffice `soffice`), and keeps page-linked memos inside `... - Raw Notes.md` between `<!-- content-reader:page:N:start/end -->` markers.
 - `content_reader/polish.py` — Stage 2: shells out to the **Codex CLI** (signed-in ChatGPT app) to write polished notes; guarded by input hashes and a lock file. `scripts/` holds the finalizer and nightly batch entry points.
 - `web/` — vanilla JS front end (`app.js`), CodeMirror 6 editor bundle (`editor-source.js` → built into `editor-bundle.js` via `node build-editor.mjs`, esbuild). Live LaTeX preview with MathJax; `\`-triggered symbol autocomplete.
 - Tests in `tests/` (pytest style). Runtime caches live in `runtime/` (gitignored — contains private lecture renders).
@@ -33,7 +33,7 @@ This is the project's instruction markdown. It records the original assignment, 
 1. **Automations run in Codex, not elsewhere.** Do not create new scheduling/automation systems (no cron, no extra agents) for the nightly polish.
 2. **Don't change features beyond what is asked.** Fix bugs, but keep behavior otherwise identical.
 3. Original lecture files and raw memos must never be modified by tooling; notes live only between the page marker comments.
-4. Never publish private data: `runtime/`, the Obsidian vault contents, and `pkcs11.txt` are gitignored and must stay out of the public repo.
+4. Never publish private data: `runtime/`, the Obsidian vault contents, `pkcs11.txt`, and the personal `config.json` are gitignored and must stay out of the public repo.
 5. **Nightly polishing is note-only.** It must not modify project source code, configuration, scripts, tests, documentation, LaunchAgents, or any other completed implementation file. If a code change appears necessary, stop, notify the owner, and obtain explicit approval before editing anything.
 
 ## 4. Infrastructure set up on the owner's Mac (July 13, 2026)
@@ -84,8 +84,16 @@ Owner wanted a letter-based link. Result: **http://margin.local**. Implementatio
 ### Phase F — nightly code immutability (same session)
 The owner added a hard rule that nightly polishing must never change completed project code without first notifying them and receiving explicit approval. The Stage 2 Codex subprocess is therefore rooted at the private `runtime/drafts/` directory instead of the project root, while the Obsidian vault remains its only additional writable directory. Its prompt also restricts it to creating the requested draft and invoking the deterministic finalizer. Project files remain readable for the finalizer but are not writable by the polishing subprocess.
 
+### Phase G — publishable version for other users (same session)
+Owner request: make the repo publishable to their GitHub account for users with **their own vaults and their own AIs**, specifying how Obsidian-Sync and Polish (manual + auto) work for them, without changing the original functions. Work done:
+
+1. **Genericized identity, not behavior.** `config.json` (personal vault path) untracked and gitignored; `config.example.json` added with a placeholder path; the missing-config error now points at it. `start.command` uses `$HOME` instead of a hard-coded user path (it already fell back to system `python3` on other machines). The two `HKU_Obsidian` strings in `web/index.html` became neutral placeholders (the health check overwrites the vault label at runtime anyway). Added `requirements.txt`. No Python/JS behavior changed.
+2. **Specified the two subsystems for outside users** in `docs/`: `obsidian-sync.md` (vault contract: per-lecture artifacts, `library.json`, page-marker memo format, course-code routing + reconciliation, atomicity guarantees, own-vault checklist) and `polish.md` (pipeline stages, manual vs nightly entry points via `pending_lectures.py`/`polish_pending.py` under any scheduler, the note-only safety contract, the bring-your-own-AI agent contract with Claude Code/Gemini CLI drop-in command examples, and the no-AI manual finalizer path). `docs/setup.md` covers install/config/auto-start generically. README rewritten as the generic entry point linking to all three.
+3. The BYO-AI section documents swapping the one command list in `run_codex_polish()`; the owner's own deployment keeps Codex (constraint #1 untouched).
+
 ## 8. Current state / loose ends
 
 - All requested features work and are verified: import, per-page memos, LaTeX autocomplete, live math preview, Obsidian sync, Stage-2 polish (Codex), auto-start, margin.local.
 - Nightly Stage 2 has no write access to the project source tree. Any proposed code change must be reported to the owner and approved as a separate development task.
+- The repo is generic/publishable: `config.json` is untracked (owner keeps a local copy; users start from `config.example.json`), and `docs/` specifies setup, the vault contract, and the polish pipeline for third-party vaults and AI agents.
 - Ideas the owner has not requested (ask before doing): continuous scroll in the main viewer, pinch-zoom, multi-vault support, auth-protected remote hosting.
