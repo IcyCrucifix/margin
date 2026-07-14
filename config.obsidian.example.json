@@ -1,0 +1,15 @@
+{
+  "storage_mode": "obsidian",
+  "vault_path": "~/Documents/Obsidian/My Vault",
+  "notes_root": "Lecture Notes",
+  "host": "127.0.0.1",
+  "port": 4317,
+  "route_to_existing_course_folder": true,
+  "max_upload_mb": 250,
+  "polish_command": null,
+  "auto_polish": {
+    "enabled": false,
+    "daily_at": "23:00",
+    "run_on_start": false
+  }
+}

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#14213a" />
+    <title>Margin — Lecture Notes</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css?v=20260714-public2" />
+    <script src="/editor-bundle.js" defer></script>
+    <script src="/app.js?v=20260714-public2" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="library-rail" aria-label="Lecture library">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">M</div>
+          <div>
+            <strong>Margin</strong>
+            <span>Lecture workspace</span>
+          </div>
+        </div>
+
+        <button class="open-button" id="openFileButton" type="button">
+          <span aria-hidden="true">＋</span> Open lecture
+        </button>
+        <button class="batch-button" id="polishPendingButton" type="button" disabled>
+          <span aria-hidden="true">✦</span>
+          <span><strong>Polish pending</strong><small id="autoPolishStatus">Manual batch</small></span>
+        </button>
+        <input id="fileInput" type="file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+
+        <label class="search-box">
+          <span class="sr-only">Filter lectures</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="librarySearch" type="search" placeholder="Filter library" autocomplete="off" />
+        </label>
+
+        <div class="library-heading">
+          <span>Recent lectures</span>
+          <span id="lectureCount">0</span>
+        </div>
+        <nav class="lecture-list" id="lectureList" aria-live="polite"></nav>
+
+        <button class="vault-card checking" id="vaultStatusCard" type="button" aria-live="polite" title="Click to verify again">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div class="vault-status-copy">
+            <strong id="vaultStatusText">Checking notes storage…</strong>
+            <span id="vaultLabel">Configured notes folder</span>
+            <small id="vaultProof">Testing read and write access</small>
+          </div>
+          <span class="verify-again" aria-hidden="true">↻</span>
+        </button>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-bar">
+          <div class="document-identity">
+            <span class="eyebrow" id="courseLabel">LECTURE READER</span>
+            <h1 id="documentTitle">Open a PDF or PowerPoint</h1>
+          </div>
+          <div class="workspace-actions">
+            <div class="page-counter" id="pageCounter" hidden>
+              <button id="previousPage" type="button" aria-label="Previous page">←</button>
+              <span><strong id="currentPageLabel">1</strong> / <span id="totalPagesLabel">1</span></span>
+              <button id="nextPage" type="button" aria-label="Next page">→</button>
+            </div>
+            <button class="stage-button" id="polishButton" type="button" disabled>
+              <span class="stage-icon" aria-hidden="true">✦</span>
+              <span><small>STAGE 2</small>Polish now</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="empty-state" id="emptyState">
+          <div class="empty-illustration" aria-hidden="true">
+            <span class="sheet sheet-back"></span>
+            <span class="sheet sheet-front"><b>1</b><i></i><i></i><i></i></span>
+          </div>
+          <span class="eyebrow">PAGE-LINKED CLASS NOTES</span>
+          <h2>Your lecture on one side.<br />Your thinking on the other.</h2>
+          <p>Open a PDF or PowerPoint. Every memo is saved under its exact page in your configured notes workspace, without changing the original file.</p>
+          <button class="primary-button" id="emptyOpenButton" type="button">Choose a lecture</button>
+          <div class="drop-hint" id="dropHint">or drop a .pdf / .pptx anywhere</div>
+        </section>
+
+        <section class="reader-layout" id="readerLayout" hidden>
+          <aside class="page-strip" tabindex="0" aria-label="Page thumbnails. Scroll with the trackpad; use left and right arrows to change pages." aria-keyshortcuts="ArrowLeft ArrowRight">
+            <div class="page-strip-label">THUMBNAILS</div>
+            <div id="pageList" class="page-list"></div>
+          </aside>
+
+          <div class="page-stage" id="pageStage" tabindex="0" aria-label="Lecture page viewer. Use left and right arrows to change pages." aria-keyshortcuts="ArrowLeft ArrowRight">
+            <div class="stage-toolbar">
+              <span id="pageKindLabel">PAGE 1</span>
+              <div class="zoom-controls" aria-label="Page zoom">
+                <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+                <span id="zoomLabel">100%</span>
+                <button id="zoomIn" type="button" aria-label="Zoom in">＋</button>
+              </div>
+            </div>
+            <div class="page-canvas" id="pageCanvas">
+              <div class="page-loading" id="pageLoading">Rendering page…</div>
+              <img id="pageImage" alt="Current lecture page" />
+            </div>
+          </div>
+
+          <aside class="notes-panel" aria-label="Page memo editor">
+            <div class="notes-header">
+              <div>
+                <span class="eyebrow">PAGE MEMO</span>
+                <h2 id="memoTitle">Notes for page 1</h2>
+              </div>
+              <span class="save-state" id="saveState"><i></i> Saved</span>
+            </div>
+            <div class="format-bar" role="toolbar" aria-label="Markdown formatting">
+              <button type="button" data-format="bold" aria-label="Bold"><b>B</b></button>
+              <button type="button" data-format="italic" aria-label="Italic"><i>I</i></button>
+              <button type="button" data-format="bullet" aria-label="Bullet list">• List</button>
+              <button type="button" data-format="inlineMath" aria-label="Inline math">$x$</button>
+              <button type="button" data-format="displayMath" aria-label="Display math">∑</button>
+              <button type="button" data-format="code" aria-label="Inline code">&lt;/&gt;</button>
+            </div>
+            <div class="editor-wrap">
+              <div id="noteEditor" class="live-preview-editor" aria-label="Markdown notes for current page"></div>
+            </div>
+            <div class="editor-footer">
+              <span><kbd>\</kbd> symbols</span>
+              <span><kbd>⌘</kbd><kbd>S</kbd> save</span>
+              <span><kbd>←</kbd>/<kbd>→</kbd> viewer pages</span>
+              <span class="markdown-badge">MD + LaTeX</span>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="import-dialog" id="importDialog">
+      <form method="dialog" id="importForm">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">ADD TO LECTURE LIBRARY</span>
+            <h2>Sort this lecture</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close">×</button>
+        </div>
+        <div class="file-pill">
+          <span class="file-kind" id="importFileKind">PDF</span>
+          <div><strong id="importFileName"></strong><span id="importFileSize"></span></div>
+        </div>
+        <label>Course<input id="importCourse" required placeholder="e.g. ELEC2441" autocomplete="off" /></label>
+        <label>Lecture title<input id="importTitle" required placeholder="e.g. Cache Memory" autocomplete="off" /></label>
+        <label>Lecture date<input id="importDate" required type="date" /></label>
+        <p class="dialog-note">The source is copied untouched. Notes are written separately inside your configured notes workspace.</p>
+        <div class="dialog-actions">
+          <button value="cancel" type="submit" class="secondary-button">Cancel</button>
+          <button id="importSubmit" value="default" type="submit" class="primary-button">Import lecture</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="polish-dialog" id="polishDialog">
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">SAFE POLISHING</span>
+            <h2 id="polishDialogTitle">Stage 2 options</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close">×</button>
+        </div>
+
+        <div class="polish-status-card">
+          <strong id="polishAvailabilityMessage">Checking your AI connection…</strong>
+          <span id="polishRunnerReason">Margin is checking whether direct polishing is available.</span>
+        </div>
+
+        <button class="primary-button direct-polish-button" id="directPolishButton" type="button" disabled>
+          Polish this lecture in Margin
+        </button>
+
+        <div class="prompt-choice">
+          <div>
+            <strong>Use your own AI once</strong>
+            <span>Copies a complete hidden prompt that safely creates and finalizes the requested polished note.</span>
+          </div>
+          <button class="secondary-button" id="copyManualPromptButton" type="button">Copy one-time polish prompt</button>
+        </div>
+
+        <div class="prompt-choice">
+          <div>
+            <strong>Create nightly polishing</strong>
+            <span>Copies a provider-neutral template asking your AI system to create a recurring nightly automation.</span>
+          </div>
+          <button class="secondary-button" id="copyNightlyPromptButton" type="button">Copy nightly automation prompt</button>
+        </div>
+
+        <p class="dialog-footnote">Prompt contents stay hidden in Margin and are copied only when you press a copy button.</p>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
