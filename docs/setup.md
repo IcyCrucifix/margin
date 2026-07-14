@@ -17,7 +17,7 @@ Without LibreOffice, PowerPoint pages display as text placeholders and notes sti
 
 ## Choose storage
 
-### Ordinary folder — default, no Obsidian
+### Ordinary folder (non-Obsidian)
 
 ```bash
 cp config.example.json config.json
