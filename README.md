@@ -1,3 +1,5 @@
+English | [简体中文](README.zh-CN.md)
+
 # Margin: Content reader with a built-in notes system
 
 Margin is a local browser workspace for page-linked lecture notes. It opens PDF and PowerPoint files, keeps Markdown/LaTeX memos matched to their exact pages, and can turn the source plus those memos into polished notes later.
@@ -21,6 +23,20 @@ On macOS, the guided installer creates a project virtual environment, installs t
 ```
 
 Then use either the direct local interface at <http://127.0.0.1:4317> or activate the public interface at <https://icycrucifix.github.io/margin/workspace/>. Both use the same companion and local library.
+
+### Connect the hosted workspace to your local library
+
+The hosted workspace is only the interface. Before it can display a library, each user must install and start the local Margin companion on `127.0.0.1:4317`.
+
+1. Run `./start.command` and leave its terminal window open.
+2. Open <https://icycrucifix.github.io/margin/workspace/> in desktop Chrome.
+3. Choose **Connect to local Margin**.
+4. If Chrome asks, allow this site to connect to apps on this device. Older Chrome versions may describe this as local-network access.
+5. In the local **Connect Margin** window, verify that the requester is `https://icycrucifix.github.io`, then choose **Allow connection**.
+
+Chrome receives access only to Margin on this computer through the loopback address. The companion receives read/write access only to the notes folder or Obsidian vault selected during setup and to lecture files the user explicitly imports. GitHub receives no lecture files, notes, vault paths, session token, or filesystem access.
+
+If the browser blocks the confirmation window or the connection still fails, see [Hosted-workspace permissions and troubleshooting](docs/setup.md#connect-the-hosted-workspace).
 
 For manual setup, the folder example creates `~/Documents/Margin Notes` automatically:
 
