@@ -43,6 +43,11 @@ for (const file of requiredFiles) {
 }
 
 const files = await collectFiles(outputRoot);
+const requiredFileSet = new Set(requiredFiles);
+const unexpectedFiles = files.filter((file) => !requiredFileSet.has(file));
+if (unexpectedFiles.length) {
+  throw new Error(`Unexpected files included in Pages artifact: ${unexpectedFiles.join(", ")}`);
+}
 for (const file of files) {
   if (forbiddenNames.has(path.posix.basename(file))) {
     throw new Error(`Private runtime file included in Pages artifact: ${file}`);
