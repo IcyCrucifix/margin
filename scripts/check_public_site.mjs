@@ -91,6 +91,22 @@ if (workspaceHtml.includes("__PUBLIC_LOCALES__")) {
   throw new Error("The public workspace locale bundle was not installed.");
 }
 
+const connectionScript = await readFile(
+  path.join(outputRoot, "workspace", "workspace-connection.js"),
+  "utf8",
+);
+const pairingWindowPosition = connectionScript.indexOf("window.open(");
+const statusRequestPosition = connectionScript.indexOf(
+  'window.MarginApi.request("/api/connect/status")',
+);
+if (
+  pairingWindowPosition < 0
+  || statusRequestPosition < 0
+  || pairingWindowPosition > statusRequestPosition
+) {
+  throw new Error("The installed local Margin confirmation must open before the loopback status request.");
+}
+
 for (const htmlFile of ["index.html", "workspace/index.html"]) {
   const document = await readFile(path.join(outputRoot, htmlFile), "utf8");
   const documentRoot = path.dirname(path.join(outputRoot, htmlFile));
