@@ -28,6 +28,7 @@ const FALLBACK_LANGUAGE_OPTIONS = Object.freeze([
   { code: "en", english_name: "English", native_name: "English" },
   { code: "zh-Hans", english_name: "Simplified Chinese", native_name: "简体中文" },
 ]);
+const TOAST_FADE_DURATION_MS = 240;
 const elements = {
   openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"), fileInput: $("#fileInput"),
   polishPendingButton: $("#polishPendingButton"), autoPolishStatus: $("#autoPolishStatus"),
@@ -72,11 +73,19 @@ function mutateOptions(options = {}) {
 }
 
 function showToast(message, error = false, duration = 4200) {
+  clearTimeout(showToast.timer);
+  clearTimeout(showToast.hideTimer);
   elements.toast.textContent = message;
   elements.toast.classList.toggle("error", error);
+  elements.toast.classList.remove("is-hiding");
   elements.toast.hidden = false;
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => { elements.toast.hidden = true; }, duration);
+  showToast.timer = setTimeout(() => {
+    elements.toast.classList.add("is-hiding");
+    showToast.hideTimer = setTimeout(() => {
+      elements.toast.hidden = true;
+      elements.toast.classList.remove("is-hiding");
+    }, TOAST_FADE_DURATION_MS);
+  }, duration);
 }
 
 function localizeServerMessage(message) {
@@ -455,13 +464,19 @@ function defaultNoteLanguage() {
   return state.languageOptions.some((item) => item.code === stored) ? stored : "en";
 }
 
+function languageOptionLabel(language) {
+  return language.native_name === language.english_name
+    ? language.native_name
+    : `${language.native_name} - ${language.english_name}`;
+}
+
 function populateLanguageOptions() {
   const current = window.MarginI18n.currentLocale();
   elements.interfaceLanguage.replaceChildren();
   state.languageOptions.forEach((language) => {
     const option = document.createElement("option");
     option.value = language.code;
-    option.textContent = language.native_name;
+    option.textContent = languageOptionLabel(language);
     elements.interfaceLanguage.append(option);
   });
   elements.interfaceLanguage.value = current;

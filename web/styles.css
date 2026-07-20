@@ -57,9 +57,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 .brand-row strong { font-family: Georgia, serif; font-size: 18px; letter-spacing: .01em; }
 .brand-row span { margin-top: 2px; color: #a9b4c8; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 
-.open-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 11px 14px; border: 0; border-radius: 11px; background: var(--accent); color: white; font-weight: 750; cursor: pointer; box-shadow: 0 8px 20px rgba(239, 109, 76, .2); }
+.open-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 11px 14px; border: 0; border-radius: 11px; background: var(--accent); color: white; font-size: 11px; font-weight: 750; cursor: pointer; box-shadow: 0 8px 20px rgba(239, 109, 76, .2); }
 .open-button:hover { background: #f47b5c; }
-.open-button span { font-size: 20px; font-weight: 400; line-height: 12px; }
+.open-button > span[aria-hidden="true"] { font-size: 20px; font-weight: 400; line-height: 12px; }
 .batch-button { display: flex; width: 100%; align-items: center; gap: 9px; margin-top: 8px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.045); color: #dbe3ef; text-align: left; cursor: pointer; }
 .batch-button:hover:not(:disabled) { background: rgba(255,255,255,.09); }
 .batch-button:disabled { cursor: not-allowed; opacity: .42; }
@@ -260,7 +260,8 @@ kbd { display: inline-grid; min-width: 15px; height: 15px; margin-right: 2px; pl
 .shortcut-list dt span { margin: 0 3px; color: #9a9da3; font-size: 8px; text-transform: uppercase; }
 .shortcut-list dt kbd { min-width: 27px; height: 23px; padding: 0 6px; font-size: 10px; }
 .shortcut-list dd { margin: 0; color: #6f7784; font-size: 10px; line-height: 1.5; }
-.toast { position: fixed; z-index: 20; right: 22px; bottom: 22px; max-width: 390px; padding: 12px 15px; border-radius: 11px; background: var(--ink); color: white; box-shadow: 0 12px 34px rgba(20,31,50,.24); font-size: 11px; line-height: 1.45; }
+.toast { position: fixed; z-index: 20; right: 22px; bottom: 22px; max-width: 390px; padding: 12px 15px; border-radius: 11px; opacity: 1; transform: translateY(0); background: var(--ink); color: white; box-shadow: 0 12px 34px rgba(20,31,50,.24); font-size: 11px; line-height: 1.45; transition: opacity 240ms ease, transform 240ms ease; }
+.toast.is-hiding { opacity: 0; transform: translateY(6px); pointer-events: none; }
 .toast.error { background: #a54232; }
 
 @media (max-width: 1120px) {
