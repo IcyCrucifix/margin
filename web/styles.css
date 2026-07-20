@@ -100,6 +100,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 .vault-card.disconnected strong { color: #ffc0b5; }
 .verify-again { display: grid !important; width: 20px; height: 20px; margin: 0 !important; place-items: center; border-radius: 6px; color: #708097 !important; font-size: 12px !important; transition: color .15s, transform .2s; }
 .vault-card:hover .verify-again { color: #b9c4d5 !important; transform: rotate(35deg); }
+.public-disconnect { margin: 8px 6px 0; padding: 7px; border: 0; background: transparent; color: #8795ab; font-size: 9px; text-decoration: underline; cursor: pointer; }
+.public-disconnect:hover { color: #d8f4e3; }
 @keyframes status-pulse { 50% { opacity: .35; transform: scale(.78); } }
 
 .workspace { display: grid; min-width: 0; min-height: 0; grid-template-rows: 73px minmax(0, 1fr); }

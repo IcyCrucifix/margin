@@ -15,6 +15,15 @@ const requiredFiles = [
   "assets/og.png",
   "assets/responsive.css",
   "assets/tokens.css",
+  "workspace/api-client.js",
+  "workspace/app.js",
+  "workspace/connection.css",
+  "workspace/editor-bundle.js",
+  "workspace/i18n.js",
+  "workspace/index.html",
+  "workspace/locales.js",
+  "workspace/styles.css",
+  "workspace/workspace-connection.js",
 ];
 const forbiddenNames = new Set(["config.json", "pkcs11.txt"]);
 const forbiddenText = [
@@ -61,22 +70,47 @@ if (!html.includes(`Margin v${packageMetadata.version}`) || html.includes("__MAR
 if (/<script\b/i.test(html) || /<form\b/i.test(html) || /<input\b/i.test(html)) {
   throw new Error("The product site must not include scripts, forms, or input controls.");
 }
-
-for (const match of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
-  const reference = match[1];
-  if (/^(?:https?:|#)/.test(reference)) continue;
-  if (reference.startsWith("/")) {
-    throw new Error(`Root-relative asset is unsafe under /margin/: ${reference}`);
-  }
-  const target = reference.replace(/^\.\//, "").split(/[?#]/, 1)[0] || "index.html";
-  const resolved = path.resolve(outputRoot, target);
-  if (!resolved.startsWith(`${outputRoot}${path.sep}`)) {
-    throw new Error(`Local link escapes the Pages artifact: ${reference}`);
-  }
-  await access(resolved);
+if (!html.includes('href="./workspace/"')) {
+  throw new Error("The product site must link to the published workspace.");
 }
 
-for (const file of files.filter((name) => /\.(?:html|css|txt)$/i.test(name))) {
+const workspaceHtml = await readFile(path.join(outputRoot, "workspace", "index.html"), "utf8");
+if (!workspaceHtml.includes("Content-Security-Policy") || !workspaceHtml.includes("connect-src http://127.0.0.1:4317")) {
+  throw new Error("The public workspace must restrict data requests to the loopback companion.");
+}
+if (workspaceHtml.includes("connect-src 'self'")) {
+  throw new Error("The public workspace must not connect back to GitHub Pages.");
+}
+if (!workspaceHtml.includes('id="connectionGate"') || !workspaceHtml.includes("Connect to local Margin")) {
+  throw new Error("The public workspace must begin behind the local connection screen.");
+}
+if (!workspaceHtml.includes('name="margin-public-workspace"')) {
+  throw new Error("The published workspace must activate public-companion mode.");
+}
+if (workspaceHtml.includes("__PUBLIC_LOCALES__")) {
+  throw new Error("The public workspace locale bundle was not installed.");
+}
+
+for (const htmlFile of ["index.html", "workspace/index.html"]) {
+  const document = await readFile(path.join(outputRoot, htmlFile), "utf8");
+  const documentRoot = path.dirname(path.join(outputRoot, htmlFile));
+  for (const match of document.matchAll(/(?:href|src)="([^"]+)"/g)) {
+    const reference = match[1];
+    if (/^(?:https?:|#|data:)/.test(reference)) continue;
+    if (reference.startsWith("/")) {
+      throw new Error(`Root-relative asset is unsafe under /margin/: ${reference}`);
+    }
+    const target = reference.replace(/^\.\//, "").split(/[?#]/, 1)[0] || "index.html";
+    const resolved = path.resolve(documentRoot, target);
+    if (!resolved.startsWith(outputRoot)) {
+      throw new Error(`Local link escapes the Pages artifact: ${reference}`);
+    }
+    const candidate = path.extname(resolved) ? resolved : path.join(resolved, "index.html");
+    await access(candidate);
+  }
+}
+
+for (const file of files.filter((name) => /\.(?:html|css|js|txt)$/i.test(name))) {
   const contents = await readFile(path.join(outputRoot, file), "utf8");
   for (const pattern of forbiddenText) {
     if (pattern.test(contents)) throw new Error(`Sensitive text matched in ${file}: ${pattern}`);

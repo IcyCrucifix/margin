@@ -1,6 +1,7 @@
 {
   "document.title": "Margin — Lecture Notes",
   "brand.subtitle": "Lecture workspace",
+  "connection.disconnect": "Disconnect public workspace",
   "open.lecture": "Open lecture",
   "polish.pending": "Polish pending",
   "polish.manual_batch": "Manual batch",

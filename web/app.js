@@ -58,18 +58,11 @@ const elements = {
 };
 
 async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  let payload;
-  try { payload = await response.json(); } catch { payload = {}; }
-  if (!response.ok) {
-    const message = payload.error_key ? t(payload.error_key, payload.error_params || {}) : payload.error;
-    throw new Error(message || `Request failed (${response.status})`);
-  }
-  return payload;
+  return window.MarginApi.request(path, options);
 }
 
 function mutateOptions(options = {}) {
-  return { ...options, headers: { "X-Content-Reader": "1", ...(options.headers || {}) } };
+  return window.MarginApi.mutationOptions(options);
 }
 
 function showToast(message, error = false, duration = 4200) {
@@ -243,9 +236,10 @@ function createThumbnailObserver() {
   return new IntersectionObserver((entries, observer) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return;
-      entry.target.src = entry.target.dataset.src;
-      entry.target.removeAttribute("data-src");
+      const path = entry.target.dataset.path;
+      entry.target.removeAttribute("data-path");
       observer.unobserve(entry.target);
+      window.MarginApi.assignImage(entry.target, path).catch(() => { entry.target.hidden = true; });
     });
   }, { root: elements.pageList, rootMargin: "320px 0px" });
 }
@@ -253,10 +247,10 @@ function createThumbnailObserver() {
 function loadThumbnailWhenVisible(thumbnail, page) {
   const source = thumbnailImageUrl(page);
   if (!state.thumbnailObserver) {
-    thumbnail.src = source;
+    window.MarginApi.assignImage(thumbnail, source).catch(() => { thumbnail.hidden = true; });
     return;
   }
-  thumbnail.dataset.src = source;
+  thumbnail.dataset.path = source;
   state.thumbnailObserver.observe(thumbnail);
 }
 
@@ -299,10 +293,8 @@ function preloadNearbyPages(page) {
       const key = `${documentId}:${candidate}`;
       if (state.preloadedPages.has(key)) return;
       state.preloadedPages.add(key);
-      const image = new Image();
-      image.decoding = "async";
-      image.fetchPriority = "low";
-      image.src = `/api/doc/${documentId}/page/${candidate}?reload=${state.renderRevision}`;
+      const path = `/api/doc/${documentId}/page/${candidate}?reload=${state.renderRevision}`;
+      window.MarginApi.preloadImage(path).catch(() => state.preloadedPages.delete(key));
     });
   };
   if ("requestIdleCallback" in window) window.requestIdleCallback(preload, { timeout: 400 });
@@ -342,7 +334,11 @@ function renderPage() {
     elements.pageLoading.hidden = false;
   };
   state.loadingTimer = setTimeout(() => { elements.pageLoading.hidden = false; }, 140);
-  elements.pageImage.src = pageImageUrl(page);
+  window.MarginApi.assignImage(elements.pageImage, pageImageUrl(page)).catch(() => {
+    clearTimeout(state.loadingTimer);
+    elements.pageLoading.textContent = t("reader.render_failed");
+    elements.pageLoading.hidden = false;
+  });
   updatePageListState();
 }
 
@@ -429,6 +425,7 @@ function applyZoom() {
 }
 
 function chooseFile(file) {
+  if (!window.MarginApi.hasSession()) return;
   if (!file) return;
   const extension = file.name.split(".").pop().toLowerCase();
   if (!["pdf", "pptx"].includes(extension)) return showToast(t("toast.file_type"), true);
@@ -891,8 +888,8 @@ window.addEventListener("margin:languagechange", () => {
   checkVaultConnection();
 });
 
-(async () => {
+window.MarginConnection.initialize(async () => {
   await window.MarginI18n.ready();
   await loadLanguageOptions();
   await loadLibrary();
-})().catch((error) => showToast(error.message, true, 9000));
+}).catch((error) => showToast(error.message, true, 9000));
