@@ -95,6 +95,13 @@ const connectionScript = await readFile(
   path.join(outputRoot, "workspace", "workspace-connection.js"),
   "utf8",
 );
+const apiClient = await readFile(
+  path.join(outputRoot, "workspace", "api-client.js"),
+  "utf8",
+);
+if (!apiClient.includes('targetAddressSpace = "loopback"')) {
+  throw new Error("The public workspace must identify 127.0.0.1 as loopback.");
+}
 const pairingWindowPosition = connectionScript.indexOf("window.open(");
 const statusRequestPosition = connectionScript.indexOf(
   'window.MarginApi.request("/api/connect/status")',

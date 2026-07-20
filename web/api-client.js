@@ -13,7 +13,7 @@
     const headers = new Headers(options.headers || {});
     if (isPublicWorkspace && sessionToken) headers.set("X-Margin-Session", sessionToken);
     const next = { ...options, headers };
-    if (isPublicWorkspace) next.targetAddressSpace = "local";
+    if (isPublicWorkspace) next.targetAddressSpace = "loopback";
     return next;
   }
 
