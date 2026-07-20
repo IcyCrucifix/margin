@@ -60,6 +60,8 @@ class ServerIntegrationTest(unittest.TestCase):
             return content
 
     def test_import_save_render_and_stage_two_noop(self) -> None:
+        languages = self.request("/api/languages")
+        self.assertEqual([item["code"] for item in languages["languages"]], ["en", "zh-Hans"])
         health = self.request("/api/health")
         self.assertTrue(health["connected"])
         self.assertEqual(health["storage_mode"], "obsidian")
@@ -73,10 +75,12 @@ class ServerIntegrationTest(unittest.TestCase):
                 "course": "MATH1853",
                 "title": "Vectors",
                 "date": "2026-07-13",
+                "polished_note_language": "zh-Hans",
             }
         )
         imported = self.request(f"/api/import?{query}", method="POST", body=sample_pdf(1))
         document = imported["document"]
+        self.assertEqual(document["polished_note_language"], "zh-Hans")
         self.request(
             f"/api/doc/{document['id']}/note",
             method="PUT",
@@ -86,6 +90,10 @@ class ServerIntegrationTest(unittest.TestCase):
         self.assertIn("\\sqrt", notes["1"])
         shell = self.request("/")
         self.assertIn(b'id="reloadFileButton"', shell)
+        self.assertIn(b'id="languageButton"', shell)
+        self.assertIn(b'<svg viewBox="0 0 24 24"', shell)
+        self.assertNotIn("文/A".encode(), shell)
+        self.assertIn(b"/i18n.js", shell)
         self.assertIn(b'id="shortcutHelpButton"', shell)
         self.assertIn(b">Keyboard Shortcuts</span>", shell)
         self.assertIn(b'id="shortcutsDialog"', shell)
@@ -113,6 +121,13 @@ class ServerIntegrationTest(unittest.TestCase):
         result = self.request(f"/api/doc/{document['id']}/polish", method="POST", body=b"")
         self.assertEqual(result["status"], "skipped")
         self.assertIn("Already up to date", result["message"])
+        language_update = self.request(
+            f"/api/doc/{document['id']}/polished-note-language",
+            method="PUT",
+            json_body={"language": "en", "apply": "future"},
+        )
+        self.assertEqual(language_update["document"]["polished_note_language"], "en")
+        self.assertFalse(language_update["document"]["language_repolish_requested"])
         batch = self.request("/api/polish/pending", method="POST", body=b"")
         self.assertEqual(batch["status"], "skipped")
         self.assertIn("No pending lectures", batch["message"])

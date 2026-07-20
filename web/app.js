@@ -12,13 +12,17 @@ const state = {
   health: null,
   loadingTimer: null,
   preloadedPages: new Set(),
+  thumbnailObserver: null,
   renderRevision: 0,
   editor: null,
   polishPrompts: null,
   polishPromptScope: "selected",
+  languageOptions: [],
+  pendingLanguageChange: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
+const t = (key, values = {}) => window.MarginI18n.t(key, values);
 const elements = {
   openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"), fileInput: $("#fileInput"),
   polishPendingButton: $("#polishPendingButton"), autoPolishStatus: $("#autoPolishStatus"),
@@ -40,13 +44,20 @@ const elements = {
   polishAvailabilityMessage: $("#polishAvailabilityMessage"), polishRunnerReason: $("#polishRunnerReason"),
   directPolishButton: $("#directPolishButton"), copyManualPromptButton: $("#copyManualPromptButton"),
   copyNightlyPromptButton: $("#copyNightlyPromptButton"), shortcutsDialog: $("#shortcutsDialog"),
+  languageButton: $("#languageButton"), languageDialog: $("#languageDialog"), languageForm: $("#languageForm"),
+  interfaceLanguage: $("#interfaceLanguage"), languageContextNote: $("#languageContextNote"),
+  languageConfirmDialog: $("#languageConfirmDialog"), languageConfirmForm: $("#languageConfirmForm"), languageConfirmBody: $("#languageConfirmBody"),
+  languageFutureButton: $("#languageFutureButton"), languageRepolishButton: $("#languageRepolishButton"),
 };
 
 async function api(path, options = {}) {
   const response = await fetch(path, options);
   let payload;
   try { payload = await response.json(); } catch { payload = {}; }
-  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const message = payload.error_key ? t(payload.error_key, payload.error_params || {}) : payload.error;
+    throw new Error(message || `Request failed (${response.status})`);
+  }
   return payload;
 }
 
@@ -60,6 +71,16 @@ function showToast(message, error = false, duration = 4200) {
   elements.toast.hidden = false;
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => { elements.toast.hidden = true; }, duration);
+}
+
+function localizeServerMessage(message) {
+  const known = {
+    "Already up to date — Stage 2 found no source or memo changes.": "polish.already_current",
+    "Already up to date — the source and raw memos have not changed.": "polish.already_current",
+    "No pending lectures — every polished note is current.": "library.nothing_pending",
+    "Stage 2 finished without installing a current polished note.": "toast.stage_two_failed",
+  };
+  return known[message] ? t(known[message]) : message;
 }
 
 function isEditingTarget(target) {
@@ -83,35 +104,35 @@ async function loadLibrary(preferredId = null) {
 async function checkVaultConnection() {
   elements.vaultStatusCard.classList.remove("connected", "disconnected");
   elements.vaultStatusCard.classList.add("checking");
-  elements.vaultStatusText.textContent = "Checking notes storage…";
-  elements.vaultProof.textContent = "Testing read and write access";
+  elements.vaultStatusText.textContent = t("storage.checking");
+  elements.vaultProof.textContent = t("storage.testing_access");
   try {
     const health = await api("/api/health");
     state.health = health;
     const isObsidian = health.storage_mode === "obsidian";
-    elements.vaultLabel.textContent = `${health.root_name || health.vault_name || "Configured folder"} · ${health.storage_label || "Notes folder"}`;
-    elements.vaultStatusCard.title = `${health.root_path || health.vault_path}\n${health.reason}\nClick to verify again`;
+    elements.vaultLabel.textContent = `${health.root_name || health.vault_name || t("storage.configured_folder")} · ${health.storage_label || t("storage.notes_folder")}`;
+    elements.vaultStatusCard.title = `${health.root_path || health.vault_path}\n${health.reason || ""}\n${t("storage.verify_again")}`;
     if (!state.batchRunning) {
       elements.autoPolishStatus.textContent = health.automation?.enabled
-        ? `Automatic · daily at ${health.automation.daily_at}`
-        : "Manual batch";
+        ? t("storage.automatic_daily", { time: health.automation.daily_at })
+        : t("polish.manual_batch");
     }
     elements.vaultStatusCard.classList.remove("checking");
     if (health.connected) {
       elements.vaultStatusCard.classList.add("connected");
-      elements.vaultStatusText.textContent = isObsidian ? "Obsidian verified" : "Notes folder verified";
-      elements.vaultProof.textContent = `${isObsidian ? "Vault detected" : "Folder ready"} · Read/write passed · just now`;
+      elements.vaultStatusText.textContent = isObsidian ? t("storage.obsidian_verified") : t("storage.notes_folder_verified");
+      elements.vaultProof.textContent = `${isObsidian ? t("storage.vault_detected") : t("storage.folder_ready")} · ${t("storage.read_write_passed")}`;
     } else {
       elements.vaultStatusCard.classList.add("disconnected");
-      elements.vaultStatusText.textContent = isObsidian ? "Obsidian unavailable" : "Notes folder unavailable";
-      elements.vaultProof.textContent = health.reason || "Storage verification failed";
+      elements.vaultStatusText.textContent = isObsidian ? t("storage.obsidian_unavailable") : t("storage.notes_folder_unavailable");
+      elements.vaultProof.textContent = health.reason || t("storage.verification_failed");
     }
     return health;
   } catch (error) {
     elements.vaultStatusCard.classList.remove("checking");
     elements.vaultStatusCard.classList.add("disconnected");
-    elements.vaultStatusText.textContent = "Local service unavailable";
-    elements.vaultProof.textContent = "Click to check again";
+    elements.vaultStatusText.textContent = t("storage.local_service_unavailable");
+    elements.vaultProof.textContent = t("storage.click_check_again");
     elements.vaultStatusCard.title = error.message;
     return { connected: false, reason: error.message };
   }
@@ -124,13 +145,17 @@ function renderLibrary() {
   const pendingCount = state.documents.filter((doc) => doc.has_notes && !doc.polished_current).length;
   elements.polishPendingButton.disabled = state.batchRunning || pendingCount === 0;
   if (!state.batchRunning && !state.health?.automation?.enabled) {
-    elements.autoPolishStatus.textContent = pendingCount ? `${pendingCount} lecture${pendingCount === 1 ? "" : "s"} ready` : "Nothing pending";
+    elements.autoPolishStatus.textContent = pendingCount === 1
+      ? t("library.lecture_ready", { count: pendingCount })
+      : pendingCount > 1
+        ? t("library.lectures_ready", { count: pendingCount })
+        : t("library.nothing_pending");
   }
   elements.lectureList.replaceChildren();
   if (!visible.length) {
     const empty = document.createElement("div");
     empty.className = "library-empty";
-    empty.textContent = state.documents.length ? "No matching lectures." : "Your imported lectures will appear here.";
+    empty.textContent = state.documents.length ? t("library.no_matching") : t("library.empty");
     elements.lectureList.append(empty);
     return;
   }
@@ -149,7 +174,7 @@ function renderLibrary() {
 function formatDate(value) {
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) return value || "";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(window.MarginI18n.currentLocale(), { month: "short", day: "numeric" }).format(date);
 }
 
 async function selectDocument(id, saveFirst = true) {
@@ -170,13 +195,15 @@ async function selectDocument(id, saveFirst = true) {
   elements.totalPagesLabel.textContent = String(doc.page_count);
   elements.polishButton.disabled = state.batchRunning || !doc.has_notes;
   elements.polishButton.classList.toggle("is-current", Boolean(doc.polished_current));
-  elements.polishButton.querySelector("span:last-child").lastChild.textContent = doc.polished_current ? "Up to date" : "Polish now";
+  elements.polishButton.querySelector("span:last-child").lastChild.textContent = doc.polished_current ? t("reader.up_to_date") : t("reader.polish_now");
   renderLibrary();
   renderPageList();
   renderPage();
 }
 
 function renderPageList() {
+  state.thumbnailObserver?.disconnect();
+  state.thumbnailObserver = createThumbnailObserver();
   elements.pageList.replaceChildren();
   if (!state.active) return;
   for (let page = 1; page <= state.active.page_count; page += 1) {
@@ -184,16 +211,38 @@ function renderPageList() {
     button.type = "button";
     button.className = `page-tile${page === state.page ? " active" : ""}`;
     button.dataset.page = String(page);
-    button.setAttribute("aria-label", `Page ${page}`);
+    button.setAttribute("aria-label", t("reader.page_label", { page }));
     button.innerHTML = `<span class="page-thumb-frame"><img class="page-thumb" alt="" loading="lazy" decoding="async" fetchpriority="low"></span><span class="page-tile-footer">${page}</span><span class="page-note-dot${state.notes[String(page)]?.trim() ? " visible" : ""}"></span>`;
     const thumbnail = button.querySelector(".page-thumb");
     thumbnail.addEventListener("load", () => button.classList.add("thumbnail-ready"), { once: true });
     thumbnail.addEventListener("error", () => { thumbnail.hidden = true; }, { once: true });
-    thumbnail.src = thumbnailImageUrl(page);
+    loadThumbnailWhenVisible(thumbnail, page);
     button.addEventListener("click", () => goToPage(page));
     elements.pageList.append(button);
   }
   updatePageListState();
+}
+
+function createThumbnailObserver() {
+  if (!("IntersectionObserver" in window)) return null;
+  return new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.src = entry.target.dataset.src;
+      entry.target.removeAttribute("data-src");
+      observer.unobserve(entry.target);
+    });
+  }, { root: elements.pageList, rootMargin: "320px 0px" });
+}
+
+function loadThumbnailWhenVisible(thumbnail, page) {
+  const source = thumbnailImageUrl(page);
+  if (!state.thumbnailObserver) {
+    thumbnail.src = source;
+    return;
+  }
+  thumbnail.dataset.src = source;
+  state.thumbnailObserver.observe(thumbnail);
 }
 
 function updatePageListState() {
@@ -249,15 +298,19 @@ function renderPage() {
   if (!state.active) return;
   const page = state.page;
   elements.currentPageLabel.textContent = String(page);
-  elements.pageKindLabel.textContent = `${state.active.kind === "pptx" ? "SLIDE" : "PAGE"} ${page}`;
-  elements.memoTitle.textContent = `Notes for ${state.active.kind === "pptx" ? "slide" : "page"} ${page}`;
+  elements.pageKindLabel.textContent = state.active.kind === "pptx"
+    ? t("reader.slide", { page })
+    : t("reader.page", { page });
+  elements.memoTitle.textContent = state.active.kind === "pptx"
+    ? t("reader.notes_for_slide", { page })
+    : t("reader.notes_for_page", { page });
   elements.previousPage.disabled = page === 1;
   elements.nextPage.disabled = page === state.active.page_count;
   state.editor.setValue(state.notes[String(page)] || "");
   state.savedValue = state.editor.getValue();
-  setSaveState("saved", "Saved");
+  setSaveState("saved", t("reader.saved"));
   clearTimeout(state.loadingTimer);
-  elements.pageLoading.textContent = "Rendering page…";
+  elements.pageLoading.textContent = t("reader.rendering_page");
   elements.pageLoading.hidden = true;
   elements.pageImage.style.visibility = "hidden";
   elements.pageImage.fetchPriority = "high";
@@ -270,7 +323,7 @@ function renderPage() {
   };
   elements.pageImage.onerror = () => {
     clearTimeout(state.loadingTimer);
-    elements.pageLoading.textContent = "Could not render this page. Use Reload file to retry.";
+    elements.pageLoading.textContent = t("reader.render_failed");
     elements.pageLoading.hidden = false;
   };
   state.loadingTimer = setTimeout(() => { elements.pageLoading.hidden = false; }, 140);
@@ -283,7 +336,7 @@ async function reloadFile() {
   const currentValue = state.editor?.getValue() || "";
   await saveNow();
   if (state.savedValue !== currentValue) {
-    showToast("The file was not reloaded because the current page memo could not be saved.", true, 6500);
+    showToast(t("toast.reload_save_failed"), true, 6500);
     return;
   }
   elements.reloadFileButton.disabled = true;
@@ -292,7 +345,7 @@ async function reloadFile() {
   renderPageList();
   renderPage();
   elements.reloadFileButton.disabled = false;
-  showToast("File reloaded. Page notes stayed assigned.");
+  showToast(t("toast.file_reloaded"));
 }
 
 async function goToPage(page) {
@@ -307,10 +360,15 @@ function setSaveState(kind, text) {
   elements.saveState.lastChild.textContent = ` ${text}`;
 }
 
+function localizeEditorPlaceholder() {
+  const placeholder = elements.noteEditor.querySelector(".cm-placeholder");
+  if (placeholder) placeholder.textContent = t("reader.editor_placeholder");
+}
+
 function queueSave(value = state.editor?.getValue() || "") {
   if (!state.active) return;
   state.notes[String(state.page)] = value;
-  setSaveState("saving", "Unsaved");
+  setSaveState("saving", t("reader.unsaved"));
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(saveNow, 650);
   updateCurrentPageNoteDot();
@@ -323,14 +381,14 @@ async function saveNow() {
   const documentId = state.active.id;
   const page = state.page;
   const content = currentValue;
-  setSaveState("saving", "Saving…");
+  setSaveState("saving", t("reader.saving"));
   try {
     const result = await api(`/api/doc/${documentId}/note`, mutateOptions({
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ page, content }),
     }));
     if (state.active?.id === documentId && state.page === page && state.editor.getValue() === content) {
       state.savedValue = content;
-      setSaveState("saved", "Saved");
+      setSaveState("saved", t("reader.saved"));
     }
     const doc = state.documents.find((item) => item.id === documentId);
     if (doc) {
@@ -338,13 +396,13 @@ async function saveNow() {
       doc.polished_current = false;
       elements.polishButton.disabled = state.batchRunning || !doc.has_notes;
       elements.polishButton.classList.remove("is-current");
-      elements.polishButton.querySelector("span:last-child").lastChild.textContent = "Polish now";
+      elements.polishButton.querySelector("span:last-child").lastChild.textContent = t("reader.polish_now");
       elements.polishPendingButton.disabled = state.batchRunning
         || !state.documents.some((item) => item.has_notes && !item.polished_current);
     }
     return result;
   } catch (error) {
-    setSaveState("error", "Save failed");
+    setSaveState("error", t("reader.save_failed"));
     showToast(error.message, true);
   }
 }
@@ -358,7 +416,7 @@ function applyZoom() {
 function chooseFile(file) {
   if (!file) return;
   const extension = file.name.split(".").pop().toLowerCase();
-  if (!["pdf", "pptx"].includes(extension)) return showToast("Choose a PDF or PPTX file.", true);
+  if (!["pdf", "pptx"].includes(extension)) return showToast(t("toast.file_type"), true);
   state.pendingFile = file;
   elements.importFileKind.textContent = extension.toUpperCase();
   elements.importFileName.textContent = file.name;
@@ -366,6 +424,136 @@ function chooseFile(file) {
   elements.importTitle.value = file.name.replace(/\.(pdf|pptx)$/i, "").replace(/[_-]+/g, " ");
   elements.importDate.value = new Date().toLocaleDateString("en-CA");
   elements.importDialog.showModal();
+}
+
+const DEFAULT_NOTE_LANGUAGE_KEY = "margin.defaultPolishedNoteLanguage";
+
+function defaultNoteLanguage() {
+  const stored = localStorage.getItem(DEFAULT_NOTE_LANGUAGE_KEY);
+  return state.languageOptions.some((item) => item.code === stored) ? stored : "en";
+}
+
+function populateLanguageOptions() {
+  const current = window.MarginI18n.currentLocale();
+  elements.interfaceLanguage.replaceChildren();
+  state.languageOptions.forEach((language) => {
+    const option = document.createElement("option");
+    option.value = language.code;
+    option.textContent = language.native_name;
+    elements.interfaceLanguage.append(option);
+  });
+  elements.interfaceLanguage.value = current;
+}
+
+function updateLanguageContext() {
+  elements.languageContextNote.textContent = state.active
+    ? t("language.active_note")
+    : t("language.no_active_note");
+}
+
+async function openLanguageDialog() {
+  try {
+    if (!state.languageOptions.length) {
+      const result = await api("/api/languages");
+      state.languageOptions = result.languages || [];
+    }
+    populateLanguageOptions();
+    updateLanguageContext();
+    elements.languageDialog.showModal();
+  } catch (error) {
+    showToast(error.message, true, 7000);
+  }
+}
+
+function selectedLanguageScope() {
+  return document.querySelector("input[name='languageScope']:checked")?.value || "interface";
+}
+
+async function savePolishedNoteLanguage(language, apply) {
+  const documentId = state.active?.id;
+  if (!documentId) {
+    localStorage.setItem(DEFAULT_NOTE_LANGUAGE_KEY, language);
+    return;
+  }
+  const result = await api(`/api/doc/${documentId}/polished-note-language`, mutateOptions({
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language, apply }),
+  }));
+  const updated = result.document;
+  state.documents = state.documents.map((doc) => doc.id === updated.id ? { ...doc, ...updated } : doc);
+  if (state.active?.id === updated.id) state.active = { ...state.active, ...updated };
+  localStorage.setItem(DEFAULT_NOTE_LANGUAGE_KEY, language);
+  renderLibrary();
+  return updated;
+}
+
+function showLanguageConfirm(language) {
+  const currentCode = state.active?.installed_polished_note_language || "en";
+  const current = state.languageOptions.find((item) => item.code === currentCode);
+  const next = state.languageOptions.find((item) => item.code === language);
+  state.pendingLanguageChange = language;
+  elements.languageConfirmBody.textContent = t("language.confirm_body", {
+    language: current?.native_name || currentCode,
+    next_language: next?.native_name || language,
+  });
+  elements.languageConfirmDialog.showModal();
+}
+
+async function applyLanguagePreference(language, scope) {
+  await window.MarginI18n.setLocale(language);
+  showToast(t("language.interface_updated"));
+  if (scope !== "interface-and-notes") return;
+
+  localStorage.setItem(DEFAULT_NOTE_LANGUAGE_KEY, language);
+  if (!state.active) return;
+  const current = state.active.installed_polished_note_language || "en";
+  const hasPolishedNote = Boolean(state.active.polished_exists);
+  if (hasPolishedNote && current !== language) {
+    showLanguageConfirm(language);
+    return;
+  }
+  await savePolishedNoteLanguage(language, "future");
+  showToast(t("language.note_future", { language: state.languageOptions.find((item) => item.code === language)?.native_name || language }));
+}
+
+async function submitLanguageDialog(event) {
+  event.preventDefault();
+  if (event.submitter?.value === "cancel") {
+    elements.languageDialog.close();
+    return;
+  }
+  const language = elements.interfaceLanguage.value;
+  const scope = selectedLanguageScope();
+  elements.languageDialog.close();
+  try {
+    await applyLanguagePreference(language, scope);
+  } catch (error) {
+    showToast(error.message, true, 7000);
+  }
+}
+
+async function chooseLanguageUpdate(apply) {
+  const language = state.pendingLanguageChange;
+  state.pendingLanguageChange = null;
+  elements.languageConfirmDialog.close();
+  if (!language) return;
+  try {
+    await savePolishedNoteLanguage(language, apply);
+    const label = state.languageOptions.find((item) => item.code === language)?.native_name || language;
+    if (apply === "repolish") {
+      showToast(t("language.note_pending", { language: label }));
+      await openPolishOptions("selected");
+    } else {
+      showToast(t("language.note_future", { language: label }));
+    }
+  } catch (error) {
+    showToast(error.message, true, 7000);
+  }
+}
+
+function closeLanguageConfirmation() {
+  state.pendingLanguageChange = null;
 }
 
 async function importLecture(event) {
@@ -378,14 +566,18 @@ async function importLecture(event) {
   }
   if (!state.pendingFile || !elements.importForm.reportValidity()) return;
   const params = new URLSearchParams({
-    filename: state.pendingFile.name, course: elements.importCourse.value, title: elements.importTitle.value, date: elements.importDate.value,
+    filename: state.pendingFile.name,
+    course: elements.importCourse.value,
+    title: elements.importTitle.value,
+    date: elements.importDate.value,
+    polished_note_language: defaultNoteLanguage(),
   });
   elements.importSubmit.disabled = true;
-  elements.importSubmit.textContent = "Reading pages…";
+  elements.importSubmit.textContent = t("import.reading_pages");
   try {
     const { document } = await api(`/api/import?${params}`, mutateOptions({ method: "POST", body: state.pendingFile }));
     elements.importDialog.close();
-    showToast(`${document.title} is ready. Raw notes are linked in your notes workspace.`);
+    showToast(t("import.ready", { title: document.title }));
     state.pendingFile = null;
     elements.fileInput.value = "";
     await loadLibrary(document.id);
@@ -393,7 +585,7 @@ async function importLecture(event) {
     showToast(error.message, true, 7000);
   } finally {
     elements.importSubmit.disabled = false;
-    elements.importSubmit.textContent = "Import lecture";
+    elements.importSubmit.textContent = t("import.submit");
   }
 }
 
@@ -419,12 +611,12 @@ async function copyText(text) {
 
 async function copyPolishPrompt(kind, button) {
   const prompt = state.polishPrompts?.[kind];
-  if (!prompt) return showToast("The prompt is not ready yet.", true);
+  if (!prompt) return showToast(t("polish.prompt_not_ready"), true);
   const original = button.textContent;
   try {
     await copyText(prompt);
-    button.textContent = "Copied";
-    showToast("Prompt copied. Paste it into your AI or automation task.");
+    button.textContent = t("polish.copied_short");
+    showToast(t("polish.copied"));
     setTimeout(() => { button.textContent = original; }, 1800);
   } catch (error) {
     showToast(error.message, true);
@@ -447,24 +639,23 @@ async function openPolishOptions(scope = "selected", directFailure = "") {
     state.polishPromptScope = scope;
     const available = Boolean(result.runner?.available) && !directFailure;
     elements.polishDialogTitle.textContent = scope === "selected"
-      ? "Stage 2 options"
-      : "Polish pending lectures";
+      ? t("polish.options")
+      : t("polish.pending_title");
     elements.directPolishButton.textContent = scope === "selected"
-      ? "Polish this lecture in Margin"
-      : "Polish pending in Margin";
+      ? t("polish.this_lecture")
+      : t("polish.pending_in_margin");
     elements.directPolishButton.disabled = !available;
     elements.copyManualPromptButton.textContent = scope === "selected"
-      ? "Copy one-time polish prompt"
-      : "Copy pending-batch prompt";
-    elements.copyNightlyPromptButton.textContent = "Copy nightly automation prompt";
+      ? t("polish.copy_once")
+      : t("polish.copy_batch");
+    elements.copyNightlyPromptButton.textContent = t("polish.copy_nightly");
     if (available) {
-      elements.polishAvailabilityMessage.textContent = `${result.runner.label} is ready for direct polishing.`;
-      elements.polishRunnerReason.textContent = "Run Stage 2 here, or copy a hidden prompt for another AI system.";
+      elements.polishAvailabilityMessage.textContent = t("polish.ready", { label: result.runner.label });
+      elements.polishRunnerReason.textContent = t("polish.ready_reason");
       elements.polishRunnerReason.classList.remove("error");
     } else {
-      elements.polishAvailabilityMessage.textContent = result.runner?.message
-        || "Direct manual polishing is unavailable. You may copy one of the prompts below into your AI automation to activate your own polishing system.";
-      elements.polishRunnerReason.textContent = directFailure || result.runner?.reason || "No direct AI runner is connected.";
+      elements.polishAvailabilityMessage.textContent = t("polish.unavailable");
+      elements.polishRunnerReason.textContent = directFailure || result.runner?.reason || t("polish.no_runner");
       elements.polishRunnerReason.classList.add("error");
     }
     elements.polishDialog.showModal();
@@ -488,11 +679,11 @@ async function polishNowDirect() {
   if (!state.active) return;
   await saveNow();
   elements.polishButton.disabled = true;
-  elements.polishButton.querySelector("span:last-child").lastChild.textContent = "Starting…";
+    elements.polishButton.querySelector("span:last-child").lastChild.textContent = t("polish.starting");
   try {
     const result = await api(`/api/doc/${state.active.id}/polish`, mutateOptions({ method: "POST" }));
     if (result.status === "skipped") {
-      showToast(result.message);
+      showToast(localizeServerMessage(result.message));
       await loadLibrary(state.active.id);
       return;
     }
@@ -500,11 +691,11 @@ async function polishNowDirect() {
       await openPolishOptions("selected", result.reason || result.message);
       return;
     }
-    showToast("Stage 2 is running. You can keep taking notes; changed inputs will be protected.", false, 6500);
+    showToast(t("polish.running"), false, 6500);
     pollJob(result.id, result.kind === "batch");
   } catch (error) {
     elements.polishButton.disabled = false;
-    elements.polishButton.querySelector("span:last-child").lastChild.textContent = "Polish now";
+    elements.polishButton.querySelector("span:last-child").lastChild.textContent = t("reader.polish_now");
     showToast(error.message, true, 7000);
   }
 }
@@ -514,12 +705,12 @@ async function polishPendingDirect() {
   state.batchRunning = true;
   elements.polishPendingButton.disabled = true;
   elements.polishButton.disabled = true;
-  elements.autoPolishStatus.textContent = "Starting…";
+  elements.autoPolishStatus.textContent = t("polish.batch_starting");
   try {
     const result = await api("/api/polish/pending", mutateOptions({ method: "POST" }));
     if (result.status === "skipped") {
       state.batchRunning = false;
-      showToast(result.message);
+      showToast(localizeServerMessage(result.message));
       await loadLibrary(state.active?.id);
       return;
     }
@@ -528,11 +719,11 @@ async function polishPendingDirect() {
       await openPolishOptions("pending", result.reason || result.message);
       return;
     }
-    showToast("Polishing pending lectures one at a time. You can keep using Margin.", false, 6500);
+    showToast(t("polish.pending_running"), false, 6500);
     pollJob(result.id, true);
   } catch (error) {
     state.batchRunning = false;
-    elements.autoPolishStatus.textContent = "Manual batch";
+    elements.autoPolishStatus.textContent = t("polish.manual_batch");
     renderLibrary();
     showToast(error.message, true, 7000);
   }
@@ -546,14 +737,14 @@ function pollJob(jobId, batch = false) {
       if (job.status === "running") {
         if (batch || job.kind === "batch") {
           state.batchRunning = true;
-          elements.autoPolishStatus.textContent = `${job.processed || 0} / ${job.total || "?"} processed`;
+          elements.autoPolishStatus.textContent = t("polish.processed", { processed: job.processed || 0, total: job.total || "?" });
         } else {
-          elements.polishButton.querySelector("span:last-child").lastChild.textContent = "Polishing…";
+          elements.polishButton.querySelector("span:last-child").lastChild.textContent = t("polish.polishing");
         }
         pollJob(jobId, batch || job.kind === "batch");
       } else {
         state.batchRunning = false;
-        showToast(job.message, job.status === "failed", 8000);
+        showToast(localizeServerMessage(job.message), job.status === "failed", 8000);
         await loadLibrary(state.active?.id);
         if (job.status === "failed") {
           await openPolishOptions(batch || job.kind === "batch" ? "pending" : "selected", job.message);
@@ -579,6 +770,11 @@ elements.importDialog.addEventListener("close", () => {
 });
 elements.librarySearch.addEventListener("input", renderLibrary);
 elements.vaultStatusCard.addEventListener("click", checkVaultConnection);
+elements.languageButton.addEventListener("click", openLanguageDialog);
+elements.languageForm.addEventListener("submit", submitLanguageDialog);
+elements.languageConfirmForm.addEventListener("close", closeLanguageConfirmation);
+elements.languageFutureButton.addEventListener("click", () => chooseLanguageUpdate("future"));
+elements.languageRepolishButton.addEventListener("click", () => chooseLanguageUpdate("repolish"));
 elements.polishPendingButton.addEventListener("click", () => openPolishOptions("pending"));
 elements.previousPage.addEventListener("click", () => goToPage(state.page - 1));
 elements.nextPage.addEventListener("click", () => goToPage(state.page + 1));
@@ -613,13 +809,13 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keydown", (event) => {
   if (event.key !== "?" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
   if (isEditingTarget(event.target)) return;
-  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open) return;
+  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
   event.preventDefault();
   openShortcutHelp();
 }, { capture: true });
 window.addEventListener("keydown", (event) => {
   if (!state.active || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open) return;
+  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
   if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
   if (isEditingTarget(event.target)) return;
   event.preventDefault();
@@ -644,5 +840,18 @@ state.editor = window.MarginEditor.create({
   onSave: saveNow,
   onBlur: saveNow,
 });
+localizeEditorPlaceholder();
 
-loadLibrary().catch((error) => showToast(error.message, true, 9000));
+window.addEventListener("margin:languagechange", () => {
+  localizeEditorPlaceholder();
+  renderLibrary();
+  if (state.active) renderPage();
+  checkVaultConnection();
+});
+
+(async () => {
+  await window.MarginI18n.ready();
+  const result = await api("/api/languages");
+  state.languageOptions = result.languages || [];
+  await loadLibrary();
+})().catch((error) => showToast(error.message, true, 9000));

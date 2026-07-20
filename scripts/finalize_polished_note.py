@@ -15,7 +15,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Safely install a Stage 2 polished lecture note.")
     parser.add_argument("--doc-id", required=True)
     parser.add_argument("--body-file", required=True, type=Path)
-    parser.add_argument("--expected-hash", required=True)
+    expected = parser.add_mutually_exclusive_group(required=True)
+    expected.add_argument("--expected-hash")
+    expected.add_argument("--expected-request-hash")
     args = parser.parse_args()
     body_path = args.body_file.expanduser().resolve()
     try:
@@ -26,7 +28,10 @@ def main() -> int:
     try:
         body = body_path.read_text(encoding="utf-8")
         output = VaultStore().finalize_polished(
-            args.doc_id, body, expected_hash=args.expected_hash
+            args.doc_id,
+            body,
+            expected_hash=args.expected_hash,
+            expected_request_hash=args.expected_request_hash,
         )
     except (OSError, StoreError) as exc:
         print(str(exc), file=sys.stderr)

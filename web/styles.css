@@ -112,8 +112,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 .page-counter button:hover { background: #f1eee7; }
 .page-counter span { min-width: 66px; color: var(--ink-soft); font-size: 11px; text-align: center; }
 .page-counter strong { color: var(--ink); }
-.shortcut-button { display: flex; height: 36px; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink-soft); font-size: 10px; font-weight: 750; cursor: pointer; }
-.shortcut-button:hover { background: #f1eee7; color: var(--ink); }
+.language-button, .shortcut-button { display: flex; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink-soft); cursor: pointer; }
+.language-button { width: 36px; padding: 0; }
+.language-button svg { width: 19px; height: 19px; fill: currentColor; }
+.language-button:hover, .shortcut-button:hover { background: #f1eee7; color: var(--ink); }
+.shortcut-button { padding: 0 12px; font-size: 10px; font-weight: 750; }
 
 .stage-button { display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 14px 0 11px; border: 1px solid #24334f; border-radius: 11px; background: var(--ink); color: white; cursor: pointer; box-shadow: 0 7px 18px rgba(23,35,58,.14); }
 .stage-button:hover:not(:disabled) { transform: translateY(-1px); background: #223252; }
@@ -125,7 +128,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 
 .empty-state { display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 38px; overflow: auto; text-align: center; background: radial-gradient(circle at 50% 38%, #fffefa 0, #f6f3eb 44%, var(--paper) 76%); }
 .empty-state.dragging { box-shadow: inset 0 0 0 4px var(--accent); }
-.empty-state h2 { margin: 13px 0 12px; font-family: Georgia, serif; font-size: clamp(28px, 3vw, 45px); font-weight: 500; line-height: 1.05; letter-spacing: -.025em; }
+.empty-state h2 { margin: 13px 0 12px; font-family: Georgia, "Songti SC", "STSong", serif; font-size: clamp(28px, 3vw, 45px); font-weight: 500; line-height: 1.05; letter-spacing: -.025em; }
+.empty-state h2 span { white-space: pre-line; }
 .empty-state p { max-width: 565px; margin: 0 0 23px; color: var(--ink-soft); font-size: 14px; line-height: 1.65; }
 .empty-illustration { position: relative; width: 170px; height: 150px; margin-bottom: 14px; }
 .sheet { position: absolute; display: block; width: 112px; height: 139px; border: 1px solid #d5cec0; border-radius: 8px; background: white; box-shadow: var(--shadow); }
@@ -213,11 +217,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 kbd { display: inline-grid; min-width: 15px; height: 15px; margin-right: 2px; place-items: center; border: 1px solid #d8d3c8; border-radius: 4px; background: #faf8f3; color: #69717e; font: 8px ui-monospace, monospace; box-shadow: 0 1px 0 #d4cfc4; }
 .markdown-badge { margin-left: auto; padding: 4px 6px; border-radius: 5px; background: #e9f5ed; color: #4a785a; font-weight: 800; }
 
-.import-dialog, .polish-dialog, .shortcuts-dialog { padding: 0; border: 1px solid #d5d0c5; border-radius: 18px; background: var(--panel); box-shadow: 0 30px 90px rgba(20,30,47,.28); }
+.import-dialog, .polish-dialog, .shortcuts-dialog, .language-dialog, .language-confirm-dialog { padding: 0; border: 1px solid #d5d0c5; border-radius: 18px; background: var(--panel); box-shadow: 0 30px 90px rgba(20,30,47,.28); }
 .import-dialog { width: min(470px, calc(100vw - 32px)); }
 .polish-dialog, .shortcuts-dialog { width: min(560px, calc(100vw - 32px)); }
-.import-dialog::backdrop, .polish-dialog::backdrop, .shortcuts-dialog::backdrop { background: rgba(16,27,47,.55); backdrop-filter: blur(5px); }
-.import-dialog form, .polish-dialog form, .shortcuts-dialog form { padding: 24px; }
+.language-dialog, .language-confirm-dialog { width: min(430px, calc(100vw - 32px)); }
+.import-dialog::backdrop, .polish-dialog::backdrop, .shortcuts-dialog::backdrop, .language-dialog::backdrop, .language-confirm-dialog::backdrop { background: rgba(16,27,47,.55); backdrop-filter: blur(5px); }
+.import-dialog form, .polish-dialog form, .shortcuts-dialog form, .language-dialog form, .language-confirm-dialog form { padding: 24px; }
 .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; }
 .dialog-heading h2 { margin: 5px 0 0; font-family: Georgia, serif; font-size: 25px; }
 .icon-button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: #f0ede6; color: #737b86; font-size: 20px; cursor: pointer; }
@@ -228,6 +233,12 @@ kbd { display: inline-grid; min-width: 15px; height: 15px; margin-right: 2px; pl
 .file-pill div span { margin-top: 3px; color: #89909a; font-size: 9px; }
 .import-dialog label { display: block; margin: 13px 0; color: #5f697b; font-size: 10px; font-weight: 750; }
 .import-dialog input { display: block; width: 100%; height: 40px; margin-top: 6px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-size: 12px; }
+.language-field { display: block; margin: 18px 0; color: #5f697b; font-size: 10px; font-weight: 750; }
+.language-field select { display: block; width: 100%; height: 40px; margin-top: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-size: 12px; }
+.language-scope { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-soft); }
+.language-scope legend { padding: 0 5px; color: #5f697b; font-size: 10px; font-weight: 750; }
+.language-scope label { display: flex; align-items: center; gap: 7px; margin: 9px 0 2px; font-size: 11px; }
+.language-scope input { accent-color: var(--accent); }
 .dialog-note { margin: 17px 0; padding: 11px 13px; border-radius: 9px; background: #eef5f0; color: #52685a; font-size: 10px; line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .polish-status-card { display: grid; gap: 5px; margin: 20px 0 14px; padding: 13px 14px; border-radius: 10px; background: #eef5f0; color: #52685a; }
@@ -240,6 +251,7 @@ kbd { display: inline-grid; min-width: 15px; height: 15px; margin-right: 2px; pl
 .prompt-choice strong { margin-bottom: 4px; color: var(--ink); font-size: 11px; }
 .prompt-choice span { max-width: 310px; color: #7b8290; font-size: 9px; line-height: 1.5; }
 .prompt-choice button { min-width: 195px; }
+.language-confirm-actions { flex-wrap: wrap; }
 .dialog-footnote { margin: 5px 0 0; color: #90959c; font-size: 8px; line-height: 1.5; }
 .shortcut-list { display: grid; margin: 20px 0 0; }
 .shortcut-list > div { display: grid; grid-template-columns: minmax(180px, .8fr) 1.2fr; align-items: center; gap: 18px; padding: 13px 0; border-top: 1px solid #ebe7de; }

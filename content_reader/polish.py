@@ -3,17 +3,21 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 from .store import PROJECT_ROOT, StoreError, VaultStore
+from .languages import language_spec
 
 
 DIRECT_POLISH_UNAVAILABLE = (
     "Direct manual polishing is unavailable. You may copy one of the prompts below "
     "into your AI automation to activate your own polishing system."
 )
+CODEX_LOGIN_ATTEMPTS = 2
+DIRECT_POLISH_REASONING_EFFORT = "medium"
 
 
 def _resolve_executable(command: str) -> str | None:
@@ -28,6 +32,30 @@ def _polish_template_values(store: VaultStore, prompt: str) -> dict[str, str]:
         "notes_path": str(store.vault),
         "project_root": str(PROJECT_ROOT),
     }
+
+
+def _codex_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.setdefault("HOME", str(Path.home()))
+    environment.setdefault("CODEX_HOME", str(Path.home() / ".codex"))
+    return environment
+
+
+def _codex_is_signed_in(codex: str) -> bool:
+    for attempt in range(CODEX_LOGIN_ATTEMPTS):
+        auth = subprocess.run(
+            [codex, "login", "status"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=12,
+            check=False,
+            env=_codex_environment(),
+        )
+        if auth.returncode == 0:
+            return True
+        if attempt + 1 < CODEX_LOGIN_ATTEMPTS:
+            time.sleep(0.15)
+    return False
 
 
 def polish_runner_status(store: VaultStore) -> dict[str, Any]:
@@ -93,13 +121,7 @@ def polish_runner_status(store: VaultStore) -> dict[str, Any]:
             "message": DIRECT_POLISH_UNAVAILABLE,
         }
     try:
-        auth = subprocess.run(
-            [codex, "login", "status"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=8,
-            check=False,
-        )
+        is_signed_in = _codex_is_signed_in(codex)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
             "available": False,
@@ -108,7 +130,7 @@ def polish_runner_status(store: VaultStore) -> dict[str, Any]:
             "reason": f"Codex sign-in could not be verified: {exc}",
             "message": DIRECT_POLISH_UNAVAILABLE,
         }
-    if auth.returncode != 0:
+    if not is_signed_in:
         return {
             "available": False,
             "kind": "codex",
@@ -142,9 +164,9 @@ Target: {target}
 1. Run `{python} {pending_script} --json` and read its JSON output.
 2. Select only the target lecture(s). If a target is absent, it is already current; report that and do nothing.
 3. For every selected item, completely read `source_absolute`, `extracted_absolute`, and `raw_note_absolute`.
-4. Write a comprehensive, prerequisite-first Markdown lecture-note body. Preserve every substantive memo, cover the complete source, explain jargon before using it, keep valid `$...$` and `$$...$$` LaTeX, and never invent unsupported facts. {markdown_format} Return body content only: no YAML frontmatter, H1 title, or source links.
+4. Write a comprehensive, prerequisite-first Markdown lecture-note body. Preserve every substantive memo, cover the complete source, explain jargon before using it, keep valid `$...$` and `$$...$$` LaTeX, and never invent unsupported facts. Follow each pending item's `polished_note_language` and its language instruction. {markdown_format} Return body content only: no YAML frontmatter, H1 title, or source links.
 5. Create the body as a UTF-8 file under `{PROJECT_ROOT / 'runtime' / 'drafts'}`. Do not write anywhere else directly.
-6. Install it only by running `{python} {finalizer} --doc-id <item id> --body-file <draft path> --expected-hash <item input_hash>`.
+6. Install it only by running `{python} {finalizer} --doc-id <item id> --body-file <draft path> --expected-request-hash <item polish_request_hash>`.
 7. If the finalizer reports changed inputs, stop for that lecture without retrying. Continue only with other independently pending lectures.
 8. Report which polished notes were installed, skipped, or rejected. Never claim success unless the finalizer succeeds."""
 
@@ -176,12 +198,12 @@ Schedule it every day at {daily_at} in my local timezone. Each scheduled run mus
 {_safe_polish_instructions(store, target)}"""
 
 
-def polish_prompt(store: VaultStore, document_id: str, input_hash: str) -> tuple[str, Path]:
+def polish_prompt(store: VaultStore, document_id: str, request_hash: str) -> tuple[str, Path]:
     record = store.get_document(document_id)
     raw_path = store.vault / record["raw_note_path"]
     extracted_path = store.vault / record["extracted_path"]
     source_path = store.vault / record["source_path"]
-    draft_path = store.drafts_root / f"{document_id}-{input_hash[:10]}.md"
+    draft_path = store.drafts_root / f"{document_id}-{request_hash[:10]}.md"
     python = shutil.which("python3") or "python3"
     finalizer = PROJECT_ROOT / "scripts" / "finalize_polished_note.py"
     markdown_requirement = (
@@ -194,6 +216,7 @@ def polish_prompt(store: VaultStore, document_id: str, input_hash: str) -> tuple
         if store.storage_mode == "obsidian"
         else "Mark uncertain extraction with a normal Markdown blockquote"
     )
+    language_instruction = language_spec(record.get("polished_note_language")).output_instruction
 
     prompt = f"""You are running Stage 2 of the local lecture-note workflow for one lecture.
 
@@ -209,18 +232,19 @@ Requirements:
 2. Cover the complete lecture source, page by page, while reorganizing it into a prerequisite-first teaching structure rather than merely copying slide bullets.
 3. Explain abbreviations and jargon before relying on them. Separate what a concept is from what it does when that distinction helps.
 4. {markdown_requirement}. Use `$...$` for inline math and `$$...$$` for display math. Do not use `\\(...\\)` or `\\[...\\]` delimiters. Keep LaTeX commands valid.
-5. Do not invent facts that are absent from the source or memos. {uncertainty_requirement}.
-6. The body should normally contain: overview and learning goals, required foundations, the taught material in logical sections, worked explanations/examples where supported, a formula/key-ideas section when relevant, and a concise review checklist.
-7. Return only the body below the title. Do not add YAML frontmatter, the H1 title, source links, or raw-note links; the finalizer adds those deterministically.
-8. Never edit or delete the original source or raw memo file.
-9. This is a note-polishing task only. Do not edit Margin project code, configuration, scripts, tests, documentation, LaunchAgents, or any other completed implementation file. If code appears to need a change, stop and report the issue; editing code requires the owner's explicit approval.
-10. The only file you may create or edit directly is the draft path below. Make all permitted notes-workspace updates only by running the deterministic finalizer command.
+5. {language_instruction}
+6. Do not invent facts that are absent from the source or memos. {uncertainty_requirement}.
+7. The body should normally contain: overview and learning goals, required foundations, the taught material in logical sections, worked explanations/examples where supported, a formula/key-ideas section when relevant, and a concise review checklist.
+8. Return only the body below the title. Do not add YAML frontmatter, the H1 title, source links, or raw-note links; the finalizer adds those deterministically.
+9. Never edit or delete the original source or raw memo file.
+10. This is a note-polishing task only. Do not edit Margin project code, configuration, scripts, tests, documentation, LaunchAgents, or any other completed implementation file. If code appears to need a change, stop and report the issue; editing code requires the owner's explicit approval.
+11. The only file you may create or edit directly is the draft path below. Make all permitted notes-workspace updates only by running the deterministic finalizer command.
 
 Before installing the result, check the raw memo once more and confirm internally that every non-empty page memo is represented. Then create the UTF-8 draft at:
 {draft_path}
 
 Create that draft with your normal file-writing tool; do not use shell redirection. Finally run exactly:
-{python} {finalizer} --doc-id {document_id} --body-file {draft_path} --expected-hash {input_hash}
+{python} {finalizer} --doc-id {document_id} --body-file {draft_path} --expected-request-hash {request_hash}
 
 If the finalizer reports that inputs changed, stop without retrying so a later run can polish the new version.
 """
@@ -262,6 +286,9 @@ def build_polish_command(
             codex,
             "exec",
             "--ephemeral",
+            "--ignore-user-config",
+            "--config",
+            f'model_reasoning_effort="{DIRECT_POLISH_REASONING_EFFORT}"',
             "--color",
             "never",
             "--sandbox",
@@ -285,7 +312,11 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
         raise StoreError("Add at least one page memo before running Stage 2.")
     input_hash = store.input_hash(record)
     polished_path = store.vault / record["polished_note_path"]
-    if polished_path.exists() and record.get("polished_input_hash") == input_hash:
+    if (
+        polished_path.exists()
+        and record.get("polished_input_hash") == input_hash
+        and not record.get("language_repolish_requested", False)
+    ):
         return {
             "status": "skipped",
             "message": "Already up to date — the source and raw memos have not changed.",
@@ -304,7 +335,8 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
         }
     os.close(lock_fd)
 
-    prompt, draft_path = polish_prompt(store, document_id, input_hash)
+    request_hash = store.polish_request_hash(record)
+    prompt, draft_path = polish_prompt(store, document_id, request_hash)
     job_id = uuid.uuid4().hex[:12]
     last_message = job_dir / f"{job_id}-last-message.txt"
     log_path = job_dir / f"{job_id}.log"
@@ -318,6 +350,7 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
                 stderr=subprocess.STDOUT,
                 text=True,
                 timeout=45 * 60,
+                env=_codex_environment(),
             )
         if process.returncode != 0:
             if last_message.exists():
@@ -330,6 +363,9 @@ def run_codex_polish(store: VaultStore, document_id: str) -> dict[str, Any]:
         if (
             not polished_path.exists()
             or refreshed.get("polished_input_hash") != input_hash
+            or refreshed.get("installed_polished_note_language")
+            != language_spec(record.get("polished_note_language")).code
+            or refreshed.get("language_repolish_requested", False)
         ):
             raise StoreError("Stage 2 finished without installing a current polished note.")
         return {

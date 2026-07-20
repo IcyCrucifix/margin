@@ -73,6 +73,13 @@ class VaultStoreTest(unittest.TestCase):
         self.assertEqual(record["page_count"], 2)
         self.assertTrue(record["source_path"].startswith("Berkeley/CS161/Lecture Notes/"))
         self.assertEqual((self.vault / record["source_path"]).read_bytes(), pdf)
+        hub = (self.store.notes_root / "Lecture Notes Hub.md").read_text(encoding="utf-8")
+        lecture_row = next(line for line in hub.splitlines() if record["filename"] in line)
+        self.assertIn(
+            f"[[{record['source_path']}\\|{record['filename']}]]",
+            lecture_row,
+        )
+        self.assertEqual(lecture_row.replace(r"\|", "").count("|"), 6)
 
         note = "A canary detects a stack overwrite.\n\nInline math: $\\omega = 2\\pi f$."
         self.store.save_note(record["id"], 2, note)
@@ -90,6 +97,9 @@ class VaultStoreTest(unittest.TestCase):
         raw = (self.vault / record["raw_note_path"]).read_text(encoding="utf-8")
         self.assertIn("Class memos: [[", polished)
         self.assertIn("Polished note: [[", raw)
+        self.assertEqual(self.store.pending_documents(), [])
+
+        polished_path.unlink()
         self.assertEqual(self.store.pending_documents(), [])
 
         self.store.save_note(record["id"], 1, "A new memo after Stage 2.")
@@ -230,9 +240,55 @@ class VaultStoreTest(unittest.TestCase):
         cd_index = captured_command.index("--cd")
         self.assertEqual(Path(captured_command[cd_index + 1]), self.store.drafts_root)
         self.assertIn("--add-dir", captured_command)
+        self.assertIn("--ignore-user-config", captured_command)
+        self.assertIn('model_reasoning_effort="medium"', captured_command)
         prompt = captured_command[-1]
         self.assertIn("This is a note-polishing task only", prompt)
         self.assertIn("editing code requires the owner's explicit approval", prompt)
+
+    def test_polished_note_language_supports_future_and_repolish_modes(self) -> None:
+        record = self.store.import_document(
+            filename="language.pdf",
+            content=sample_pdf(1),
+            course="COMP2113",
+            title="Language support",
+            lecture_date="2026-07-19",
+            polished_note_language="zh-Hans",
+        )
+        self.store.save_note(record["id"], 1, "Explain the main idea.")
+        input_hash = self.store.input_hash(record["id"])
+        polished_path = self.store.finalize_polished(
+            record["id"], "## 主要概念\n\n这是简体中文笔记。", expected_hash=input_hash
+        )
+        polished = polished_path.read_text(encoding="utf-8")
+        self.assertIn("课程:", polished)
+        self.assertIn("原始讲义:", polished)
+        self.assertIn("课堂笔记:", polished)
+        self.assertIn("打开讲义文件", polished)
+        self.assertIn("打开按页面关联的课堂笔记", polished)
+        installed = self.store.get_document(record["id"])
+        self.assertEqual(installed["installed_polished_note_language"], "zh-Hans")
+        self.assertEqual(self.store.pending_documents(), [])
+
+        future = self.store.set_polished_note_language(record["id"], "en", "future")
+        self.assertFalse(future["language_repolish_requested"])
+        self.assertEqual(self.store.pending_documents(), [])
+
+        repolish = self.store.set_polished_note_language(record["id"], "en", "repolish")
+        self.assertTrue(repolish["language_repolish_requested"])
+        pending = self.store.pending_documents()
+        self.assertEqual(len(pending), 1)
+        self.assertIn("polish_request_hash", pending[0])
+        hub = (self.store.notes_root / "Lecture Notes Hub.md").read_text(encoding="utf-8")
+        self.assertIn("Pending", hub)
+        self.store.finalize_polished(
+            record["id"],
+            "## English result\n\nThe same lecture in English.",
+            expected_request_hash=pending[0]["polish_request_hash"],
+        )
+        installed = self.store.get_document(record["id"])
+        self.assertEqual(installed["installed_polished_note_language"], "en")
+        self.assertFalse(installed["language_repolish_requested"])
 
 
 if __name__ == "__main__":

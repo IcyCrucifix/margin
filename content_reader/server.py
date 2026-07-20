@@ -40,7 +40,11 @@ class JobManager:
         record = self.store.get_document(document_id)
         current_hash = self.store.input_hash(record)
         polished_path = self.store.vault / record["polished_note_path"]
-        if polished_path.exists() and record.get("polished_input_hash") == current_hash:
+        if (
+            polished_path.exists()
+            and record.get("polished_input_hash") == current_hash
+            and not record.get("language_repolish_requested", False)
+        ):
             return {
                 "status": "skipped",
                 "message": "Already up to date — Stage 2 found no source or memo changes.",
@@ -258,6 +262,14 @@ class RequestHandler(BaseHTTPRequestHandler):
                 }
             )
             return
+        if path == "/api/languages":
+            self._json(
+                {
+                    "default": "en",
+                    "languages": self.server.store.language_catalog(),
+                }
+            )
+            return
         if path == "/api/polish/prompts":
             query = urllib.parse.parse_qs(parsed.query)
             scope = query.get("scope", ["pending"])[0]
@@ -314,6 +326,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             course = self._query_value(query, "course")
             title = self._query_value(query, "title")
             lecture_date = self._query_value(query, "date")
+            polished_note_language = query.get("polished_note_language", ["en"])[0]
             length = self._content_length()
             if length > self.server.max_upload_bytes:
                 raise StoreError("That file is larger than the configured import limit.")
@@ -325,6 +338,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     course=course,
                     title=title,
                     lecture_date=lecture_date,
+                    polished_note_language=polished_note_language,
                 )
             self._json({"document": record}, HTTPStatus.CREATED)
             return
@@ -344,6 +358,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _do_put(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
+        language_match = self._match(
+            parsed.path, r"/api/doc/([a-f0-9]{16})/polished-note-language"
+        )
+        if language_match:
+            payload = self._read_json()
+            language = payload.get("language")
+            apply = payload.get("apply", "future")
+            with self.server.store_lock:
+                result = self.server.store.set_polished_note_language(
+                    language_match[0], language, apply
+                )
+            self._json({"document": result})
+            return
         match = self._match(parsed.path, r"/api/doc/([a-f0-9]{16})/note")
         if not match:
             raise StoreError("Unknown action.")

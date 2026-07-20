@@ -10,12 +10,23 @@ Every entry point runs the same guarded sequence:
 
 1. Reconcile course routing in Obsidian mode; plain-folder libraries remain central.
 2. Refuse lectures with no memos and skip polished notes whose recorded input hash is current.
-3. Compute `sha256(source_sha256 + page-memo JSON)` and acquire a per-lecture lock.
+3. Compute `sha256(source_sha256 + page-memo JSON)` plus a language-aware request hash that also includes the selected polished-note language, then acquire a per-lecture lock.
 4. Give the AI the original source, extracted page text, raw memo path, draft path, and exact finalizer command.
 5. Run `scripts/finalize_polished_note.py` with the expected hash. If a memo changed while the draft was being written, reject the stale result.
 6. Atomically install the polished note, update raw-note status and the library hash, then regenerate the hub.
 
-An unchanged lecture is never re-polished.
+An unchanged lecture is never re-polished. A language-only change can deliberately mark an existing note for repolishing without changing the source or raw memos; the old note remains installed until the guarded finalizer succeeds.
+
+## Language selection
+
+The toolbar translate icon opens a language dialog with English and Simplified Chinese (`zh-Hans`). The interface language is remembered in the browser. The dialog can also set the default language for future polished notes and, when a lecture is selected, update that lecture's target language.
+
+There are two scopes:
+
+- **Interface only** changes labels, dialogs, accessibility text, and date formatting.
+- **Interface + polished notes** also changes the target language used by Stage 2. Existing polished notes are not silently overwritten: Margin offers **Future runs only** or **Repolish now**. The latter enters the normal Stage 2 options and installs the translated note only after freshness and finalizer checks pass.
+
+The original source, page-linked raw memos, metadata keys, tags, and file paths remain unchanged. The generated body and deterministic wrapper labels are localized together.
 
 ## Manual options in the app
 

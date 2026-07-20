@@ -43,6 +43,8 @@ Re-uploading a revised file under the same filename carries the earlier page mem
 If a page or slide does not render, choose **Reload file** in the viewer toolbar. Margin retries the lecture images without re-importing the source or changing which memo belongs to each page.
 Choose **Shortcuts** in the top toolbar, or press `?` outside the memo editor, to display the keyboard shortcut list.
 
+Use the translate icon in the top toolbar to switch the interface between English and Simplified Chinese. The dialog can apply that choice to the interface only, or also set the language for polished notes. If the selected lecture already has a polished note in another language, Margin lets you keep the current note for future runs or mark it for a guarded repolish.
+
 ## Stage 2: polish manually or automatically
 
 Margin provides three entry points to the same guarded pipeline:

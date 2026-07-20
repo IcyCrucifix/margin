@@ -24,8 +24,10 @@ With the default `notes_root`, an import creates:
 
 The library also contains:
 
-- `.content-reader/library.json` — machine index, source hashes, paths, timestamps, and last polished input hash;
+- `.content-reader/library.json` — machine index, source hashes, paths, timestamps, the selected polished-note language, and the last polished input/request hashes;
 - `Lecture Notes Hub.md` — human-facing course index with links appropriate to the selected mode.
+
+Each library record uses `polished_note_language` (`en` or `zh-Hans`) for the next polished note and `installed_polished_note_language` for the language of the file currently installed. A requested language change sets `language_repolish_requested` until Stage 2 installs the new version. This keeps raw memos, source paths, YAML keys, and tags language-neutral.
 
 Re-importing the same course, title, and source bytes returns the existing record.
 If the bytes differ but the uploaded filename is the same (case-insensitive), the

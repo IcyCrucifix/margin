@@ -84,6 +84,7 @@ class PortableMarginTest(unittest.TestCase):
         self.assertIn("[Open page-linked raw notes](", polished)
         self.assertNotIn("[[", polished)
         self.assertNotIn("[[", hub)
+        self.assertIn("[lecture.pdf](", hub)
 
     def test_configured_agent_command_receives_generated_prompt(self) -> None:
         record = self.import_with_note("Custom Agent")
@@ -148,6 +149,17 @@ class PortableMarginTest(unittest.TestCase):
         self.assertIn("not signed in", status["reason"])
         self.assertEqual(status["message"], DIRECT_POLISH_UNAVAILABLE)
         self.assertEqual(login_status.call_args.args[0][-2:], ["login", "status"])
+        self.assertEqual(login_status.call_count, 2)
+
+    def test_codex_runner_status_recovers_from_transient_login_failure(self) -> None:
+        self.store.config["polish_command"] = None
+        with patch("content_reader.polish.shutil.which", return_value="/usr/bin/true"), patch(
+            "content_reader.polish.subprocess.run",
+            side_effect=[SimpleNamespace(returncode=1), SimpleNamespace(returncode=0)],
+        ):
+            status = polish_runner_status(self.store)
+
+        self.assertTrue(status["available"])
 
     def test_batch_polish_processes_pending_lectures_serially(self) -> None:
         record = self.import_with_note("Batch")
