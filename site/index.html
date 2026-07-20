@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121d32" />
+    <meta name="description" content="Margin is a local-first workspace for page-linked PDF and PowerPoint notes." />
+    <meta property="og:title" content="Margin — Lecture notes that stay with the source" />
+    <meta property="og:description" content="Read a lecture, write page-linked Markdown and LaTeX memos, and polish the result later. Your library stays local." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://icycrucifix.github.io/margin/" />
+    <meta property="og:image" content="https://icycrucifix.github.io/margin/assets/og.png" />
+    <link rel="canonical" href="https://icycrucifix.github.io/margin/" />
+    <link rel="stylesheet" href="./assets/tokens.css" />
+    <link rel="stylesheet" href="./assets/layout.css?v=20260720" />
+    <link rel="stylesheet" href="./assets/components.css" />
+    <link rel="stylesheet" href="./assets/responsive.css" />
+    <title>Margin</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Margin home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span><strong>Margin</strong><small>Local lecture workspace</small></span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#workflow">Workflow</a>
+        <a href="#privacy">Local-first</a>
+        <a href="#install">Install</a>
+        <a class="nav-source" href="https://github.com/IcyCrucifix/margin">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> PDF + PPTX · Markdown + LaTeX</p>
+          <h1 id="hero-title">Lecture notes that stay with the source.</h1>
+          <p class="hero-lede">Open a lecture, write a separate memo for each page, and turn the source plus your thinking into a polished note later—without changing the original file.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="./workspace/">Activate the Workspace</a>
+            <a class="button button-secondary" href="#install">Install Margin locally</a>
+            <a class="button button-secondary" href="https://github.com/IcyCrucifix/margin">View source</a>
+          </div>
+          <div class="local-proof" role="note">
+            <span class="status-dot" aria-hidden="true"></span>
+            <p><strong>Local by design.</strong> This website never receives your lectures or notes.</p>
+          </div>
+        </div>
+        <figure class="hero-figure">
+          <img src="./assets/margin-reader.png" alt="Margin showing a synthetic signals lecture beside page-linked Markdown notes" width="1440" height="900" />
+          <figcaption>A lecture on one side. Your thinking on the other.</figcaption>
+        </figure>
+      </section>
+
+      <section class="workflow section" id="workflow" aria-labelledby="workflow-title">
+        <div class="section-heading">
+          <p class="eyebrow">One continuous study loop</p>
+          <h2 id="workflow-title">Capture the page. Keep the context.</h2>
+          <p>Margin preserves the relationship between what the lecturer showed and what you understood in the moment.</p>
+        </div>
+        <div class="step-grid">
+          <article><span>01</span><h3>Open the lecture</h3><p>Import a PDF or PowerPoint. Margin copies it byte-for-byte and prepares page previews locally.</p></article>
+          <article><span>02</span><h3>Write beside the page</h3><p>Take Markdown and LaTeX memos per page. Typing <code>\</code> triggers quick-LaTeX suggestions; continuing with a command such as <code>\omega</code> narrows the matches.</p></article>
+          <article><span>03</span><h3>Polish when ready</h3><p>Combine the source and raw memos through your configured local AI tool—or copy a guarded prompt for your own system.</p></article>
+        </div>
+      </section>
+
+      <section class="feature-band section" aria-labelledby="features-title">
+        <div class="feature-copy">
+          <p class="eyebrow">Built for actual coursework</p>
+          <h2 id="features-title">A library that remains yours.</h2>
+          <p>Use an ordinary Markdown folder or route notes into an Obsidian vault. Raw notes, polished notes, and untouched sources remain linked without being merged into one fragile file.</p>
+          <ul class="feature-list">
+            <li><span aria-hidden="true">✓</span> Page-matched autosaving memos</li>
+            <li><span aria-hidden="true">✓</span> English and Simplified Chinese interface</li>
+            <li><span aria-hidden="true">✓</span> Same-filename reupload continuity</li>
+            <li><span aria-hidden="true">✓</span> Guarded Stage 2 input hashes</li>
+          </ul>
+        </div>
+        <figure class="detail-figure">
+          <img src="./assets/margin-notes.png" alt="Synthetic page memo with Markdown, equations, and a saved status in Margin" width="1440" height="900" />
+        </figure>
+      </section>
+
+      <section class="privacy section" id="privacy" aria-labelledby="privacy-title">
+        <div class="privacy-mark" aria-hidden="true">LOCAL</div>
+        <div>
+          <p class="eyebrow">No Margin cloud</p>
+          <h2 id="privacy-title">Your files stay on your machine.</h2>
+          <p>The public site is static: there are no accounts, uploads, analytics, or hosted processing. The local app writes only to the folder or Obsidian vault you configure. Stage 2 communicates only with an AI tool you explicitly choose to run.</p>
+        </div>
+      </section>
+
+      <section class="install section" id="install" aria-labelledby="install-title">
+        <div class="install-copy">
+          <p class="eyebrow">Margin v__MARGIN_VERSION__</p>
+          <h2 id="install-title">Run it where your notes already live.</h2>
+          <p>Margin currently runs as a local Python server with a browser interface. Start with an ordinary folder, or connect an existing Obsidian vault.</p>
+          <div class="install-actions">
+            <a class="button button-primary" href="https://github.com/IcyCrucifix/margin#quick-start">Install locally</a>
+            <a class="button button-secondary" href="https://github.com/IcyCrucifix/margin/blob/public/docs/setup.md">Read setup instructions</a>
+          </div>
+          <p class="launch-note">Already installed and running? <a href="http://margin.local" target="_blank" rel="noreferrer">Open local Margin</a>. If it does not open, start Margin locally, then <a href="https://github.com/IcyCrucifix/margin/blob/public/docs/setup.md">check the setup instructions</a>.</p>
+        </div>
+        <div class="terminal" aria-label="Margin quick-start commands">
+          <div><span></span><span></span><span></span><small>margin — local setup</small></div>
+          <pre><code><b>$</b> git clone https://github.com/IcyCrucifix/margin.git
+<b>$</b> cd margin
+<b>$</b> ./install.command
+<b>$</b> ./start.command</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span><strong>Margin</strong><small>Source beside thought.</small></span></div>
+      <p>Open source · Local-first · No hosted lecture data</p>
+      <a href="https://github.com/IcyCrucifix/margin">github.com/IcyCrucifix/margin</a>
+    </footer>
+  </body>
+</html>

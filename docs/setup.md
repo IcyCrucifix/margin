@@ -13,7 +13,17 @@ Margin is a local Python server plus a browser front end. It does not require cl
 | Obsidian | optional vault integration only | [obsidian.md](https://obsidian.md) |
 | A local AI agent | optional Stage 2 polishing only | see [polish.md](polish.md) |
 
-Without LibreOffice, PowerPoint pages display as text placeholders and notes still work. Node/pnpm are only needed when editing `web/editor-source.js`; the browser bundle is already built.
+Without Poppler, PDF pages display as readable text placeholders; without LibreOffice, PowerPoint pages do the same. Page-linked notes still work in both cases. Node/pnpm are only needed when editing `web/editor-source.js`; the browser bundle is already built.
+
+## Guided macOS install
+
+Run the signed-in user's local installer from the cloned Margin folder:
+
+```bash
+./install.command
+```
+
+It creates `.venv`, installs only the Python packages in `requirements.txt`, and asks whether to use a Markdown folder or an existing Obsidian vault. It reports the exact Homebrew commands for missing Poppler or LibreOffice but never installs system software silently. At the final prompt, you may opt into a per-user LaunchAgent that starts Margin at sign-in.
 
 ## Choose storage
 
@@ -63,42 +73,31 @@ Choose one storage mode before importing lectures. Margin does not automatically
 ## Run
 
 ```bash
-python3 -m content_reader.server --open
+./start.command
 ```
 
-On macOS, `start.command` does the same thing. Otherwise open <http://127.0.0.1:4317>. The storage card at the bottom-left reports the active mode and proves read/write access.
+`start.command` prefers the project `.venv` and otherwise uses the system `python3`; it has no dependency on a private Codex or ChatGPT runtime. Open <http://127.0.0.1:4317> for the direct local interface. The storage card at the bottom-left reports the active mode and proves read/write access.
 
-The server listens on loopback by default. Mutating requests require Margin's private local header and reject cross-site origins.
+You can instead open <https://icycrucifix.github.io/margin/workspace/> and choose **Connect to local Margin**. The local confirmation page identifies the requesting GitHub Pages origin and requires an explicit **Allow**. Its session credential stays only in JavaScript memory and expires after 12 hours without activity, when Margin restarts, or when you disconnect. Files, notes, page images, Obsidian access, and Stage 2 continue to use `127.0.0.1:4317`; GitHub serves only the static interface.
+
+The companion accepts public-workspace sessions only from `https://icycrucifix.github.io`; wildcard, opaque, and other origins are rejected. Direct local access keeps its existing same-origin behavior.
 
 ## Start at login (optional)
 
-Any service manager can keep Margin running. On macOS, create `~/Library/LaunchAgents/com.margin.content-reader.plist`:
+Pass `--launch-agent` to the guided installer, or answer yes at its final prompt:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.margin.content-reader</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/zsh</string><string>-lc</string>
-    <string>cd /path/to/margin &amp;&amp; exec python3 -m content_reader.server</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/margin-server.log</string>
-  <key>StandardErrorPath</key><string>/tmp/margin-server.log</string>
-</dict></plist>
+```bash
+./install.command --launch-agent
 ```
 
-Load it with `launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.margin.content-reader.plist`. On recent macOS versions, use `cd` inside the shell command rather than a `WorkingDirectory` under `~/Documents`.
+Margin refuses to overwrite an existing `~/Library/LaunchAgents/com.margin.content-reader.plist`. The generated agent runs this checkout's `.venv` and writes output to `~/Library/Logs/Margin.log`.
 
 If built-in daily polishing is enabled, Margin must be running at the configured time. `run_on_start: true` additionally processes the pending queue whenever the server starts.
 
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests
+.venv/bin/python3 -m unittest discover -s tests -t .
 ```
 
 The tests create temporary notes roots and never touch the user's configured folder or vault.

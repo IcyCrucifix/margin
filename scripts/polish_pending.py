@@ -14,7 +14,9 @@ from content_reader.store import StoreError, VaultStore  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Stage 2 for stale or missing polished notes.")
+    parser = argparse.ArgumentParser(
+        description="Run Stage 2 for never-polished or input-changed lecture notes."
+    )
     parser.add_argument("--doc-id", help="Polish only one lecture.")
     args = parser.parse_args()
     store = VaultStore()

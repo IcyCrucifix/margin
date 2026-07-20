@@ -14,13 +14,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .automation import DailyPolishScheduler
+from .connect_page import render_connection_page
 from .polish import (
     DIRECT_POLISH_UNAVAILABLE,
     manual_polish_automation_prompt,
     nightly_polish_automation_prompt,
     polish_runner_status,
     run_codex_polish,
+)
+from .public_access import (
+    PUBLIC_MARGIN_ORIGIN,
+    PUBLIC_PROTOCOL_VERSION,
+    PublicAccessError,
+    PublicSessionRegistry,
 )
 from .store import DEFAULT_CONFIG_PATH, PROJECT_ROOT, StoreError, VaultStore
 
@@ -40,7 +48,11 @@ class JobManager:
         record = self.store.get_document(document_id)
         current_hash = self.store.input_hash(record)
         polished_path = self.store.vault / record["polished_note_path"]
-        if polished_path.exists() and record.get("polished_input_hash") == current_hash:
+        if (
+            polished_path.exists()
+            and record.get("polished_input_hash") == current_hash
+            and not record.get("language_repolish_requested", False)
+        ):
             return {
                 "status": "skipped",
                 "message": "Already up to date — Stage 2 found no source or memo changes.",
@@ -200,6 +212,7 @@ class ContentReaderServer(ThreadingHTTPServer):
         self.jobs = JobManager(store)
         self.store_lock = threading.RLock()
         self.max_upload_bytes = int(store.config.get("max_upload_mb", 250)) * 1024 * 1024
+        self.public_sessions = PublicSessionRegistry()
         self.auto_polish = DailyPolishScheduler(store, self.jobs)
         self.auto_polish.start()
 
@@ -218,7 +231,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
+            self._require_public_api_access()
             self._do_get()
+        except PublicAccessError as exc:
+            self._json({"error": str(exc)}, exc.status)
         except StoreError as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception:
@@ -227,8 +243,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
+            self._require_public_api_access()
             self._require_local_mutation()
             self._do_post()
+        except PublicAccessError as exc:
+            self._json({"error": str(exc)}, exc.status)
         except StoreError as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception:
@@ -237,17 +256,51 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         try:
+            self._require_public_api_access()
             self._require_local_mutation()
             self._do_put()
+        except PublicAccessError as exc:
+            self._json({"error": str(exc)}, exc.status)
         except StoreError as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception:
             traceback.print_exc()
             self._json({"error": "Unexpected local server error."}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def do_OPTIONS(self) -> None:
+        origin = self.headers.get("Origin", "")
+        if origin != PUBLIC_MARGIN_ORIGIN:
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self._send_cors_headers()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Margin-Session")
+        self.send_header("Access-Control-Max-Age", "600")
+        if self.headers.get("Access-Control-Request-Private-Network") == "true":
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.end_headers()
+
     def _do_get(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        if path == "/connect":
+            query = urllib.parse.parse_qs(parsed.query)
+            origin = query.get("origin", [""])[0]
+            challenge = query.get("challenge", [""])[0]
+            self.server.public_sessions.register_challenge(origin, challenge)
+            self._html(render_connection_page(origin, challenge))
+            return
+        if path == "/api/connect/status":
+            self._json(
+                {
+                    "ok": True,
+                    "app_version": __version__,
+                    "protocol_version": PUBLIC_PROTOCOL_VERSION,
+                    "pairing_required": True,
+                }
+            )
+            return
         if path == "/api/health":
             self._json(
                 {
@@ -255,6 +308,14 @@ class RequestHandler(BaseHTTPRequestHandler):
                     **self.server.store.vault_health(),
                     "automation": self.server.auto_polish.status(),
                     "polish_runner": polish_runner_status(self.server.store),
+                }
+            )
+            return
+        if path == "/api/languages":
+            self._json(
+                {
+                    "default": "en",
+                    "languages": self.server.store.language_catalog(),
                 }
             )
             return
@@ -308,12 +369,25 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _do_post(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        if path == "/api/connect/approve":
+            payload = self._read_json()
+            token = self.server.public_sessions.approve(
+                str(payload.get("origin", "")), str(payload.get("challenge", ""))
+            )
+            self._json({"token": token})
+            return
+        if path == "/api/connect/disconnect":
+            origin = self.headers.get("Origin", "")
+            self.server.public_sessions.revoke(self.headers.get("X-Margin-Session"), origin)
+            self._json({"disconnected": True})
+            return
         if path == "/api/import":
             query = urllib.parse.parse_qs(parsed.query)
             filename = self._query_value(query, "filename")
             course = self._query_value(query, "course")
             title = self._query_value(query, "title")
             lecture_date = self._query_value(query, "date")
+            polished_note_language = query.get("polished_note_language", ["en"])[0]
             length = self._content_length()
             if length > self.server.max_upload_bytes:
                 raise StoreError("That file is larger than the configured import limit.")
@@ -325,6 +399,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     course=course,
                     title=title,
                     lecture_date=lecture_date,
+                    polished_note_language=polished_note_language,
                 )
             self._json({"document": record}, HTTPStatus.CREATED)
             return
@@ -344,6 +419,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _do_put(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
+        language_match = self._match(
+            parsed.path, r"/api/doc/([a-f0-9]{16})/polished-note-language"
+        )
+        if language_match:
+            payload = self._read_json()
+            language = payload.get("language")
+            apply = payload.get("apply", "future")
+            with self.server.store_lock:
+                result = self.server.store.set_polished_note_language(
+                    language_match[0], language, apply
+                )
+            self._json({"document": result})
+            return
         match = self._match(parsed.path, r"/api/doc/([a-f0-9]{16})/note")
         if not match:
             raise StoreError("Unknown action.")
@@ -380,6 +468,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", cache)
         self.send_header("X-Content-Type-Options", "nosniff")
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(content)
+
+    def _html(self, content: bytes) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(content)
 
@@ -390,8 +490,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(content)
+
+    def _send_cors_headers(self) -> None:
+        if self.headers.get("Origin") != PUBLIC_MARGIN_ORIGIN:
+            return
+        self.send_header("Access-Control-Allow-Origin", PUBLIC_MARGIN_ORIGIN)
+        self.send_header("Vary", "Origin")
 
     def _read_json(self) -> dict[str, Any]:
         length = self._content_length()
@@ -415,13 +522,38 @@ class RequestHandler(BaseHTTPRequestHandler):
         return length
 
     def _require_local_mutation(self) -> None:
+        origin = self.headers.get("Origin", "")
+        if origin == PUBLIC_MARGIN_ORIGIN:
+            self._require_public_session(origin)
+            return
         if self.headers.get("X-Content-Reader") != "1":
             raise StoreError("This local action requires the Content Reader interface.")
-        origin = self.headers.get("Origin")
         if origin:
             parsed = urllib.parse.urlparse(origin)
             if parsed.hostname not in {"127.0.0.1", "localhost"}:
                 raise StoreError("Cross-site requests are not allowed.")
+
+    def _require_public_api_access(self) -> None:
+        parsed = urllib.parse.urlparse(self.path)
+        if not parsed.path.startswith("/api/"):
+            return
+        origin = self.headers.get("Origin", "")
+        if not origin:
+            return
+        origin_host = urllib.parse.urlparse(origin).hostname
+        if origin_host in {"127.0.0.1", "localhost"}:
+            return
+        if origin != PUBLIC_MARGIN_ORIGIN:
+            raise PublicAccessError("Cross-site requests are not allowed.", HTTPStatus.FORBIDDEN)
+        if parsed.path == "/api/connect/status":
+            return
+        self._require_public_session(origin)
+
+    def _require_public_session(self, origin: str) -> None:
+        if not self.server.public_sessions.authorize(
+            self.headers.get("X-Margin-Session"), origin
+        ):
+            raise PublicAccessError("Connect this browser to local Margin first.", HTTPStatus.UNAUTHORIZED)
 
     @staticmethod
     def _match(path: str, pattern: str) -> tuple[str, ...] | None:

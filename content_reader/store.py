@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unicodedata
@@ -13,6 +14,9 @@ import urllib.parse
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+from .pdf_rendering import render_pdf_page_to_png
+from .languages import DEFAULT_LANGUAGE, language_options, language_spec, validate_language
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +35,34 @@ def _safe_segment(value: str, fallback: str) -> str:
 
 def _json_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
+
+
+def _escape_markdown_table_cell(value: str) -> str:
+    return value.replace("|", r"\|").replace("\n", " ")
+
+
+def _find_executable(name: str) -> str | None:
+    discovered = shutil.which(name)
+    if discovered:
+        return discovered
+
+    candidates = [
+        Path("/opt/homebrew/bin") / name,
+        Path("/usr/local/bin") / name,
+    ]
+    interpreter = Path(sys.executable).resolve()
+    if len(interpreter.parents) > 2:
+        runtime_root = interpreter.parents[2]
+        candidates.extend(
+            [
+                runtime_root / "bin" / "override" / name,
+                runtime_root / "bin" / "fallback" / name,
+            ]
+        )
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -193,12 +225,16 @@ class VaultStore:
     def list_documents(self) -> list[dict[str, Any]]:
         documents = self._load_library()["documents"]
         for document in documents:
+            document.setdefault("polished_note_language", DEFAULT_LANGUAGE)
+            document.setdefault("installed_polished_note_language", None)
+            document.setdefault("language_repolish_requested", False)
             polished = self.vault / document["polished_note_path"]
             document["polished_exists"] = polished.exists()
             document["has_notes"] = self._document_has_notes(document)
             document["polished_current"] = bool(
                 polished.exists()
                 and document.get("polished_input_hash") == self.input_hash(document)
+                and not document.get("language_repolish_requested", False)
             )
         return sorted(
             documents,
@@ -260,6 +296,7 @@ class VaultStore:
         course: str,
         title: str,
         lecture_date: str | None = None,
+        polished_note_language: str | None = None,
     ) -> dict[str, Any]:
         self.ensure_layout()
         suffix = Path(filename).suffix.lower()
@@ -275,6 +312,12 @@ class VaultStore:
             date.fromisoformat(lecture_date)
         except ValueError as exc:
             raise StoreError("Lecture date must use YYYY-MM-DD.") from exc
+        try:
+            polished_note_language = validate_language(
+                polished_note_language or DEFAULT_LANGUAGE
+            )
+        except ValueError as exc:
+            raise StoreError(str(exc)) from exc
 
         digest = hashlib.sha256(content).hexdigest()
         document_id = hashlib.sha256(
@@ -346,6 +389,9 @@ class VaultStore:
             "source_path": source_relative.as_posix(),
             "raw_note_path": raw_relative.as_posix(),
             "polished_note_path": polished_relative.as_posix(),
+            "polished_note_language": polished_note_language,
+            "installed_polished_note_language": None,
+            "language_repolish_requested": False,
             "extracted_path": extracted_relative.as_posix(),
             "rendered_pdf_path": str(rendered_pdf) if rendered_pdf else None,
             "imported_at": _now_iso(),
@@ -533,7 +579,7 @@ class VaultStore:
         if final_path.exists():
             return final_path
 
-        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        soffice = _find_executable("soffice") or _find_executable("libreoffice")
         if not soffice:
             return None
         process = subprocess.run(
@@ -687,6 +733,44 @@ class VaultStore:
             return f"> [!{kind}] {title}"
         return f"> **{title}**"
 
+    def language_catalog(self) -> list[dict[str, str]]:
+        return language_options()
+
+    def set_polished_note_language(
+        self, document_id: str, language: str, apply: str
+    ) -> dict[str, Any]:
+        if apply not in {"repolish", "future"}:
+            raise StoreError("Language apply mode must be 'repolish' or 'future'.")
+        try:
+            language = validate_language(language)
+        except ValueError as exc:
+            raise StoreError(str(exc)) from exc
+
+        library = self._load_library()
+        for record in library["documents"]:
+            if record["id"] != document_id:
+                continue
+            old_language = language_spec(
+                record.get("installed_polished_note_language")
+                or record.get("polished_note_language")
+            ).code
+            record["polished_note_language"] = language
+            record["language_repolish_requested"] = bool(
+                apply == "repolish"
+                and (self.vault / record["polished_note_path"]).exists()
+                and old_language != language
+            )
+            record["updated_at"] = _now_iso()
+            self._save_library(library)
+            self.write_hub(library["documents"])
+            result = dict(record)
+            result["language_changed"] = old_language != language
+            result["language_repolish_requested"] = record[
+                "language_repolish_requested"
+            ]
+            return result
+        raise StoreError("Lecture not found.")
+
     def _notes_for_record(self, record: dict[str, Any]) -> dict[str, str]:
         raw_path = self.vault / record["raw_note_path"]
         text = raw_path.read_text(encoding="utf-8")
@@ -810,35 +894,31 @@ class VaultStore:
         cache_dir = self.page_cache_root / document_id
         cache_dir.mkdir(parents=True, exist_ok=True)
         page_path = cache_dir / f"page-{page_number:04d}-{cache_label}.png"
-        if page_path.exists():
+        if page_path.exists() and page_path.stat().st_size:
             return page_path
+
+        legacy_page_path = cache_dir / f"page-{page_number:04d}.png"
+        if (
+            resolution >= 60
+            and legacy_page_path.exists()
+            and legacy_page_path.stat().st_size
+        ):
+            return legacy_page_path
 
         pdf_path = record.get("rendered_pdf_path")
         if pdf_path and Path(pdf_path).exists():
-            pdftoppm = shutil.which("pdftoppm")
-            if not pdftoppm:
-                raise StoreError("PDF page renderer is unavailable.")
-            prefix = cache_dir / f"page-{page_number:04d}-{cache_label}"
-            process = subprocess.run(
-                [
-                    pdftoppm,
-                    "-f",
-                    str(page_number),
-                    "-l",
-                    str(page_number),
-                    "-singlefile",
-                    "-png",
-                    "-r",
-                    str(resolution),
-                    str(pdf_path),
-                    str(prefix),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if process.returncode == 0 and page_path.exists():
-                return page_path
+            pdftoppm = _find_executable("pdftoppm")
+            if pdftoppm:
+                prefix = cache_dir / f"page-{page_number:04d}-{cache_label}"
+                rendered_page = render_pdf_page_to_png(
+                    executable=pdftoppm,
+                    pdf_path=Path(pdf_path),
+                    output_prefix=prefix,
+                    page_number=page_number,
+                    resolution=resolution,
+                )
+                if rendered_page:
+                    return rendered_page
 
         thumbnail = resolution < 60
         return self._render_text_fallback(
@@ -868,7 +948,7 @@ class VaultStore:
             rf"^## Page {page_number}\n\n(.*?)(?=\n## Page |\Z)", re.MULTILINE | re.DOTALL
         )
         match = pattern.search(extracted)
-        text = (match.group(1).strip() if match else "No extractable slide text.")
+        text = match.group(1).strip() if match else "No extractable page text."
         width, height = size
         scale = width / 1600
         image = Image.new("RGB", size, "#f7f4ed")
@@ -884,7 +964,8 @@ class VaultStore:
         )
         draw.text(
             (round(95 * scale), round(90 * scale)),
-            f"{record['title']} · Slide {page_number}",
+            f"{record['title']} · "
+            f"{'Page' if record['kind'] == 'pdf' else 'Slide'} {page_number}",
             fill="#16233a",
             font=title_font,
         )
@@ -904,17 +985,34 @@ class VaultStore:
         for record in self.list_documents():
             if not self._document_has_notes(record):
                 continue
-            polished_path = self.vault / record["polished_note_path"]
             input_hash = self.input_hash(record)
-            if not polished_path.exists() or record.get("polished_input_hash") != input_hash:
+            if (
+                record.get("polished_input_hash") != input_hash
+                or record.get("language_repolish_requested", False)
+            ):
+                polished_path = self.vault / record["polished_note_path"]
                 item = dict(record)
                 item["input_hash"] = input_hash
+                item["polish_request_hash"] = self.polish_request_hash(record)
+                item.setdefault("polished_note_language", DEFAULT_LANGUAGE)
                 item["raw_note_absolute"] = str(self.vault / record["raw_note_path"])
                 item["extracted_absolute"] = str(self.vault / record["extracted_path"])
                 item["source_absolute"] = str(self.vault / record["source_path"])
                 item["polished_note_absolute"] = str(polished_path)
                 pending.append(item)
         return pending
+
+    def polish_request_hash(self, record_or_id: dict[str, Any] | str) -> str:
+        record = (
+            self.get_document(record_or_id)
+            if isinstance(record_or_id, str)
+            else record_or_id
+        )
+        digest = hashlib.sha256()
+        digest.update(self.input_hash(record).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(language_spec(record.get("polished_note_language")).code.encode("utf-8"))
+        return digest.hexdigest()
 
     def input_hash(self, record_or_id: dict[str, Any] | str) -> str:
         record = (
@@ -931,11 +1029,20 @@ class VaultStore:
         return digest.hexdigest()
 
     def finalize_polished(
-        self, document_id: str, body: str, expected_hash: str | None = None
+        self,
+        document_id: str,
+        body: str,
+        expected_hash: str | None = None,
+        expected_request_hash: str | None = None,
     ) -> Path:
         record = self.get_document(document_id)
         current_hash = self.input_hash(record)
-        if expected_hash and current_hash != expected_hash:
+        current_request_hash = self.polish_request_hash(record)
+        if expected_request_hash and current_request_hash != expected_request_hash:
+            raise StoreError(
+                "Lecture inputs or language changed while polishing. The stale draft was not installed; run Stage 2 again."
+            )
+        if expected_hash and expected_hash not in {current_hash, current_request_hash}:
             raise StoreError(
                 "Raw notes changed while polishing. The stale draft was not installed; run Stage 2 again."
             )
@@ -946,14 +1053,15 @@ class VaultStore:
             raise StoreError("Provide only the note body; metadata is generated safely.")
 
         polished_path = self.vault / record["polished_note_path"]
+        language = language_spec(record.get("polished_note_language"))
         source_link = self._link(
             record["source_path"],
-            "Open lecture file",
+            language.source_link_label,
             from_path=record["polished_note_path"],
         )
         raw_link = self._link(
             record["raw_note_path"],
-            "Open page-linked raw notes",
+            language.raw_link_label,
             from_path=record["polished_note_path"],
         )
         content = "\n".join(
@@ -971,10 +1079,10 @@ class VaultStore:
                 "",
                 f"# {record['title']}",
                 "",
-                self._callout_heading("abstract", "Lecture links"),
-                f"> Course: **{record['course']}**  ",
-                f"> Original source: {source_link}  ",
-                f"> Class memos: {raw_link}",
+                self._callout_heading("abstract", language.lecture_links_heading),
+                f"> {language.course_label}: **{record['course']}**  ",
+                f"> {language.source_label}: {source_link}  ",
+                f"> {language.raw_notes_label}: {raw_link}",
                 "",
                 body,
                 "",
@@ -991,6 +1099,9 @@ class VaultStore:
         for document in library["documents"]:
             if document["id"] == document_id:
                 document["polished_input_hash"] = current_hash
+                document["polished_request_hash"] = current_request_hash
+                document["installed_polished_note_language"] = language.code
+                document["language_repolish_requested"] = False
                 document["polished_at"] = _now_iso()
                 break
         self._save_library(library)
@@ -1030,7 +1141,10 @@ class VaultStore:
                 courses[course], key=lambda item: item["lecture_date"], reverse=True
             ):
                 polished_exists = (self.vault / document["polished_note_path"]).exists()
-                polished_label = "Open" if polished_exists else "Pending"
+                polished_current = polished_exists and not document.get(
+                    "language_repolish_requested", False
+                )
+                polished_label = "Open" if polished_current else "Pending"
                 raw_link = self._link(document["raw_note_path"], "Raw", from_path=hub_relative)
                 polished_link = self._link(
                     document["polished_note_path"], polished_label, from_path=hub_relative
@@ -1038,8 +1152,20 @@ class VaultStore:
                 source_link = self._link(
                     document["source_path"], document["kind"].upper(), from_path=hub_relative
                 )
+                lecture_link = self._link(
+                    document["source_path"],
+                    document.get("filename") or document["title"],
+                    from_path=hub_relative,
+                )
+                cells = [
+                    document["lecture_date"],
+                    lecture_link,
+                    raw_link,
+                    polished_link,
+                    source_link,
+                ]
                 lines.append(
-                    f"| {document['lecture_date']} | {document['title']} | {raw_link} | {polished_link} | {source_link} |"
+                    "| " + " | ".join(_escape_markdown_table_cell(cell) for cell in cells) + " |"
                 )
             lines.append("")
         _atomic_write_text(hub_path, "\n".join(lines).rstrip() + "\n")
