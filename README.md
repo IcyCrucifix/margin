@@ -13,17 +13,22 @@ The source file is always copied byte-for-byte and never edited. Everything stay
 
 ## Quick start
 
+On macOS, the guided installer creates a project virtual environment, installs the Python packages, and asks where notes should live:
+
 ```bash
-cp config.example.json config.json
-python3 -m pip install -r requirements.txt
-python3 -m content_reader.server --open
+./install.command
+./start.command
 ```
 
-The example creates `~/Documents/Margin Notes` automatically. To use Obsidian instead:
+Then use either the direct local interface at <http://127.0.0.1:4317> or activate the public interface at <https://icycrucifix.github.io/margin/workspace/>. Both use the same companion and local library.
+
+For manual setup, the folder example creates `~/Documents/Margin Notes` automatically:
 
 ```bash
-cp config.obsidian.example.json config.json
-# edit vault_path, then start Margin
+cp config.example.json config.json
+python3 -m venv .venv
+.venv/bin/python3 -m pip install -r requirements.txt
+.venv/bin/python3 -m content_reader.server --open
 ```
 
 See [docs/setup.md](docs/setup.md) for dependencies, configuration, and auto-start.
@@ -78,7 +83,7 @@ The exact file and marker contract is in [docs/storage.md](docs/storage.md). Obs
 
 ## Configuration and safety
 
-`config.json` is gitignored. It controls storage mode/path, local host/port, optional AI command, and optional daily polishing. The server binds to `127.0.0.1` by default; mutations require Margin's local-only header and reject cross-site origins.
+`config.json` is gitignored. It controls storage mode/path, local host/port, optional AI command, and optional daily polishing. The server binds to `127.0.0.1` by default. Direct local mutations require Margin's private header. The published workspace must be explicitly paired and every data request requires a short-lived, origin-scoped session held only in browser memory.
 
 Stage 1 works without an AI. For Stage 2, custom agent commands should be wrapped with the narrowest filesystem permissions that agent supports. Margin's finalizer still independently validates the draft path and input hash.
 

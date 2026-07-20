@@ -1,0 +1,34 @@
+{
+  "exclude_dirs": [
+    ".agents",
+    ".codex",
+    ".git",
+    ".hg",
+    ".next",
+    ".svn",
+    ".venv",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "dist-site",
+    "generated",
+    "node_modules",
+    "outputs",
+    "target",
+    "vendor",
+    "venv",
+    "work"
+  ],
+  "line_exceptions": {
+    "content_reader/polish.py": "Pre-existing cohesive Stage 2 pipeline; splitting it is outside this companion boundary.",
+    "content_reader/server.py": "Pre-existing local HTTP router; the new credential state and pairing view are isolated in focused modules.",
+    "content_reader/store.py": "Pre-existing storage compatibility surface shared by folder and Obsidian modes.",
+    "tests/test_portability.py": "Pre-existing end-to-end Stage 2 compatibility suite.",
+    "tests/test_store.py": "Pre-existing end-to-end storage compatibility suite.",
+    "web/app.js": "Pre-existing browser workflow controller; the new transport and pairing workflows are separate modules.",
+    "web/editor-source.js": "Pre-existing cohesive CodeMirror bundle entrypoint.",
+    "web/index.html": "Pre-existing declarative application shell with dialogs and accessibility labels.",
+    "web/styles.css": "Pre-existing cohesive application stylesheet; the new connection screen has its own stylesheet."
+  }
+}

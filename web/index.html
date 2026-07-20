@@ -4,15 +4,37 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#14213a" />
-    <title>Margin — Lecture Notes</title>
+    <meta name="referrer" content="no-referrer" />
+    <!-- __PUBLIC_MODE__ -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:4317" />
+    <title>Margin</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/styles.css?v=20260719-language1" />
-    <script src="/editor-bundle.js" defer></script>
-    <script src="/i18n.js" defer></script>
-    <script src="/app.js?v=20260719-language1" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=20260720-public1" />
+    <link rel="stylesheet" href="./connection.css?v=20260720-public1" />
+    <script src="./editor-bundle.js" defer></script>
+    <script src="./api-client.js?v=20260720-public1" defer></script>
+    <!-- __PUBLIC_LOCALES__ -->
+    <script src="./i18n.js?v=20260720-public1" defer></script>
+    <script src="./workspace-connection.js?v=20260720-public1" defer></script>
+    <script src="./app.js?v=20260720-public1" defer></script>
   </head>
   <body>
-    <div class="app-shell">
+    <section class="connection-gate" id="connectionGate" aria-labelledby="connectionTitle" hidden>
+      <div class="connection-card">
+        <span class="eyebrow">LOCAL WORKSPACE</span>
+        <h1 id="connectionTitle">Activate your Margin workspace.</h1>
+        <p>The workspace interface is public, but your lecture library remains on this computer. Start the local companion and approve this browser before Margin reads any library information.</p>
+        <div class="connection-actions">
+          <button id="connectLocalMargin" type="button">Connect to local Margin</button>
+          <a href="https://github.com/IcyCrucifix/margin#quick-start">Start / Install Margin</a>
+          <a href="../">Back to product page</a>
+        </div>
+        <p class="connection-status" id="connectionStatus" role="status" aria-live="polite"></p>
+        <p class="connection-privacy"><strong>Local by design.</strong> Lecture files, memos, rendered pages, Obsidian access, and Stage 2 stay on your machine.</p>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
       <aside class="library-rail" data-i18n-aria-label="library.aria" aria-label="Lecture library">
         <div class="brand-row">
           <div class="brand-mark" aria-hidden="true">M</div>
@@ -52,6 +74,7 @@
           </div>
           <span class="verify-again" aria-hidden="true">↻</span>
         </button>
+        <button class="public-disconnect" id="disconnectLocalMargin" type="button" data-i18n="connection.disconnect" hidden>Disconnect public workspace</button>
       </aside>
 
       <main class="workspace">

@@ -18,8 +18,13 @@
 
   async function loadCatalog(locale) {
     if (catalogs[locale]) return catalogs[locale];
+    if (window.MarginLocaleCatalogs?.[locale]) {
+      catalogs[locale] = window.MarginLocaleCatalogs[locale];
+      return catalogs[locale];
+    }
     try {
-      const response = await fetch(`/locales/${encodeURIComponent(locale)}.json`, { cache: "no-cache" });
+      const localeUrl = new URL(`./locales/${encodeURIComponent(locale)}.json`, window.location.href);
+      const response = await fetch(localeUrl, { cache: "no-cache" });
       if (!response.ok) throw new Error(`Locale request failed (${response.status})`);
       catalogs[locale] = await response.json();
     } catch {
@@ -50,7 +55,7 @@
       node.alt = t(node.dataset.i18nAlt);
     });
     document.documentElement.lang = current;
-    document.title = t("document.title");
+    document.title = "Margin";
   }
 
   async function setLocale(locale, persist = true) {
