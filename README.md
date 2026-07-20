@@ -1,17 +1,34 @@
 English | [简体中文](README.zh-CN.md)
 
-# Margin: Content reader with a built-in notes system
+# Margin
 
-Margin is a local browser workspace for page-linked lecture notes. It opens PDF and PowerPoint files, keeps Markdown/LaTeX memos matched to their exact pages, and can turn the source plus those memos into polished notes later.
+**Lecture notes that stay with the source.**
 
-Use Margin during class by opening a PDF or PowerPoint and writing a separate Markdown/LaTeX memo for each page or slide; every memo stays matched to its source page without altering the original file. For formulas, type `\` followed by a symbol name—such as `\omega`—to choose from lowercase and uppercase suggestions like `\omega` and `\Omega`, or simply keep typing to dismiss them. After class, Stage 2 can combine the lecture and your memos into polished notes.
+Margin is a local-first workspace for taking notes directly beside lecture PDFs and PowerPoint slides. Each Markdown/LaTeX memo stays connected to the exact page that inspired it, so your notes keep their context long after class ends.
 
-Obsidian is optional. Margin can store notes in either:
+[Visit the website](https://icycrucifix.github.io/margin/) · [Install Margin](#quick-start) · [Read the documentation](#documentation)
 
-- any ordinary local folder, using portable Markdown links; or
-- an Obsidian vault, using wiki links, PDF page embeds, and course-folder routing.
+![Margin displaying a lecture beside page-linked Markdown and LaTeX notes](site/assets/margin-reader.png)
 
-The source file is always copied byte-for-byte and never edited. Everything stays on the user's machine.
+## Why Margin?
+
+Lecture slides and separate note documents quickly drift apart: a formula in your notes makes sense during class, but weeks later it is hard to remember which diagram, definition, or example it referred to. Margin keeps the two sides together.
+
+- **Stay beside the lecture.** Read a PDF or PowerPoint while writing a separate, autosaved memo for each page or slide.
+- **Write naturally.** Use Markdown, rendered math, and quick LaTeX suggestions such as `\omega` and `\Omega`.
+- **Keep your files.** The original lecture remains untouched, and your sources and notes stay on your own machine.
+- **Choose where notes live.** Use any ordinary folder or route everything into an existing Obsidian vault.
+- **Finish the job later.** After class, optional Stage 2 polishing can combine the lecture and your rough memos into a structured note.
+
+![A page-linked Margin memo with Markdown, equations, and autosave](site/assets/margin-notes.png)
+
+## From lecture to finished notes
+
+1. **Open the lecture.** Import a `.pdf` or `.pptx`; Margin prepares the pages locally without modifying the source.
+2. **Capture what matters.** Write beside each page during class, with every memo automatically preserved in the right context.
+3. **Polish when ready.** Keep the raw notes as they are, or use your chosen AI tool to create a structured polished note later.
+
+Obsidian is optional. Plain-folder mode uses portable Markdown links; Obsidian mode adds wiki links, PDF page embeds, and course-folder routing.
 
 ## Quick start
 
@@ -22,7 +39,7 @@ On macOS, the guided installer creates a project virtual environment, installs t
 ./start.command
 ```
 
-Then use either the direct local interface at <http://127.0.0.1:4317> or activate the public interface at <https://icycrucifix.github.io/margin/workspace/>. Both use the same companion and local library.
+After Margin is installed and running, use either the direct local interface at <http://127.0.0.1:4317> or open the hosted interface at <https://icycrucifix.github.io/margin/workspace/>. Both use the same companion and local library.
 
 ### Connect the hosted workspace to your local library
 
