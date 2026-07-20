@@ -1,0 +1,35 @@
+:root {
+  --ink: #17233a;
+  --ink-soft: #536078;
+  --navy: #121d32;
+  --navy-2: #1a2843;
+  --paper: #f3f0e8;
+  --panel: #fffefa;
+  --line: #ddd8cc;
+  --line-strong: #c9c2b4;
+  --accent: #ef6d4c;
+  --accent-dark: #cb4d30;
+  --mint: #b7ebcb;
+  --shadow: 0 24px 70px rgba(24, 34, 52, 0.16);
+  --radius: 18px;
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; overflow-x: hidden; overflow-x: clip; background: var(--paper); color: var(--ink); }
+img { display: block; max-width: 100%; }
+a { color: inherit; text-underline-offset: 3px; }
+button, a { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 4px; }
+::selection { background: var(--mint); color: var(--navy); }
+
+h1, h2, h3, p { margin-top: 0; }
+h1, h2, h3 { font-family: Georgia, "Songti SC", "STSong", serif; }
+h1 { font-size: clamp(3rem, 7.5vw, 7.2rem); font-weight: 500; line-height: .93; letter-spacing: -.055em; }
+h2 { font-size: clamp(2.25rem, 5vw, 4.8rem); font-weight: 500; line-height: 1; letter-spacing: -.04em; }
+h3 { font-size: 1.35rem; line-height: 1.2; }
+p { color: var(--ink-soft); line-height: 1.72; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }

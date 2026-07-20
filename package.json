@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:editor": "node build-editor.mjs"
+    "build:editor": "node build-editor.mjs",
+    "build:site": "node scripts/build_public_site.mjs",
+    "check:site": "node scripts/check_public_site.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
