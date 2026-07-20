@@ -98,6 +98,7 @@
   "language.default_note": "This also sets the default language for future polished notes.",
   "language.active_note": "This will update the selected lecture’s polished-note language.",
   "language.no_active_note": "No lecture is selected; this sets the default for future imports.",
+  "language.service_restart_required": "Restart the local Margin service to change polished-note languages. Interface switching is still available.",
   "language.apply": "Apply",
   "language.confirm_heading": "Update polished note language?",
   "language.confirm_body": "The current polished note is in {language}. Choose whether to regenerate it in {next_language}.",

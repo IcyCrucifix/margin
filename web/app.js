@@ -18,11 +18,16 @@ const state = {
   polishPrompts: null,
   polishPromptScope: "selected",
   languageOptions: [],
+  languageApiAvailable: true,
   pendingLanguageChange: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
 const t = (key, values = {}) => window.MarginI18n.t(key, values);
+const FALLBACK_LANGUAGE_OPTIONS = Object.freeze([
+  { code: "en", english_name: "English", native_name: "English" },
+  { code: "zh-Hans", english_name: "Simplified Chinese", native_name: "简体中文" },
+]);
 const elements = {
   openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"), fileInput: $("#fileInput"),
   polishPendingButton: $("#polishPendingButton"), autoPolishStatus: $("#autoPolishStatus"),
@@ -46,6 +51,7 @@ const elements = {
   copyNightlyPromptButton: $("#copyNightlyPromptButton"), shortcutsDialog: $("#shortcutsDialog"),
   languageButton: $("#languageButton"), languageDialog: $("#languageDialog"), languageForm: $("#languageForm"),
   interfaceLanguage: $("#interfaceLanguage"), languageContextNote: $("#languageContextNote"),
+  interfaceOnlyScope: $("#interfaceOnlyScope"), interfaceAndNotesScope: $("#interfaceAndNotesScope"), polishedNoteLanguageScope: $("#polishedNoteLanguageScope"),
   languageConfirmDialog: $("#languageConfirmDialog"), languageConfirmForm: $("#languageConfirmForm"), languageConfirmBody: $("#languageConfirmBody"),
   languageFutureButton: $("#languageFutureButton"), languageRepolishButton: $("#languageRepolishButton"),
 };
@@ -428,6 +434,22 @@ function chooseFile(file) {
 
 const DEFAULT_NOTE_LANGUAGE_KEY = "margin.defaultPolishedNoteLanguage";
 
+async function loadLanguageOptions() {
+  try {
+    const result = await api("/api/languages");
+    if (!Array.isArray(result.languages) || !result.languages.length) {
+      throw new Error("Language list is empty.");
+    }
+    state.languageOptions = result.languages;
+    state.languageApiAvailable = true;
+  } catch {
+    // Static assets can update before a long-running local Python service is restarted.
+    // Keep interface switching usable instead of preventing the whole app from loading.
+    state.languageOptions = FALLBACK_LANGUAGE_OPTIONS;
+    state.languageApiAvailable = false;
+  }
+}
+
 function defaultNoteLanguage() {
   const stored = localStorage.getItem(DEFAULT_NOTE_LANGUAGE_KEY);
   return state.languageOptions.some((item) => item.code === stored) ? stored : "en";
@@ -446,23 +468,24 @@ function populateLanguageOptions() {
 }
 
 function updateLanguageContext() {
+  const noteLanguageUnavailable = !state.languageApiAvailable;
+  elements.interfaceAndNotesScope.disabled = noteLanguageUnavailable;
+  elements.polishedNoteLanguageScope.classList.toggle("is-disabled", noteLanguageUnavailable);
+  if (noteLanguageUnavailable) {
+    elements.interfaceOnlyScope.checked = true;
+    elements.languageContextNote.textContent = t("language.service_restart_required");
+    return;
+  }
   elements.languageContextNote.textContent = state.active
     ? t("language.active_note")
     : t("language.no_active_note");
 }
 
 async function openLanguageDialog() {
-  try {
-    if (!state.languageOptions.length) {
-      const result = await api("/api/languages");
-      state.languageOptions = result.languages || [];
-    }
-    populateLanguageOptions();
-    updateLanguageContext();
-    elements.languageDialog.showModal();
-  } catch (error) {
-    showToast(error.message, true, 7000);
-  }
+  await loadLanguageOptions();
+  populateLanguageOptions();
+  updateLanguageContext();
+  elements.languageDialog.showModal();
 }
 
 function selectedLanguageScope() {
@@ -504,6 +527,10 @@ async function applyLanguagePreference(language, scope) {
   await window.MarginI18n.setLocale(language);
   showToast(t("language.interface_updated"));
   if (scope !== "interface-and-notes") return;
+  if (!state.languageApiAvailable) {
+    showToast(t("language.service_restart_required"), true, 7000);
+    return;
+  }
 
   localStorage.setItem(DEFAULT_NOTE_LANGUAGE_KEY, language);
   if (!state.active) return;
@@ -851,7 +878,6 @@ window.addEventListener("margin:languagechange", () => {
 
 (async () => {
   await window.MarginI18n.ready();
-  const result = await api("/api/languages");
-  state.languageOptions = result.languages || [];
+  await loadLanguageOptions();
   await loadLibrary();
 })().catch((error) => showToast(error.message, true, 9000));

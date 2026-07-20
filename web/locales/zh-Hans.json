@@ -98,6 +98,7 @@
   "language.default_note": "这也会设置未来润色笔记的默认语言。",
   "language.active_note": "这会更新当前所选讲义的润色笔记语言。",
   "language.no_active_note": "当前没有选中的讲义；这会设置未来导入的默认语言。",
+  "language.service_restart_required": "请重启本地 Margin 服务后再更改润色笔记语言；界面语言仍可切换。",
   "language.apply": "应用",
   "language.confirm_heading": "更新润色笔记语言？",
   "language.confirm_body": "当前润色笔记使用{language}。请选择是否用{next_language}重新生成。",
