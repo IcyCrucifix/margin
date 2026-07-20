@@ -20,7 +20,6 @@ Lecture slides and separate note documents quickly drift apart: a formula in you
 - **Choose where notes live.** Use any ordinary folder or route everything into an existing Obsidian vault.
 - **Finish the job later.** After class, optional Stage 2 polishing can combine the lecture and your rough memos into a structured note.
 
-![A page-linked Margin memo with Markdown, equations, and autosave](site/assets/margin-notes.png)
 
 ## From lecture to finished notes
 
