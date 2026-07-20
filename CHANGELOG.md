@@ -1,4 +1,4 @@
-# Margin Update Blog
+# Margin Update Log
 
 **Current version:** 1.2.0
 
