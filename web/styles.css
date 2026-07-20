@@ -194,11 +194,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .cm-editor.cm
 .format-bar button:hover { background: #eae6dc; color: var(--ink); }
 .editor-wrap { position: relative; min-height: 0; }
 .live-preview-editor { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-.live-preview-editor .cm-editor { width: 100%; height: 100%; background: transparent; color: #26334a; font: 13px/1.72 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.live-preview-editor .cm-editor { width: 100%; height: 100%; background: transparent; color: #26334a; font: 14px/1.62 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .live-preview-editor .cm-scroller { overflow: auto; font-family: inherit; }
 .live-preview-editor .cm-content { min-height: 100%; padding: 20px 22px 90px; caret-color: var(--accent-dark); }
 .live-preview-editor .cm-line { padding: 0; }
 .live-preview-editor .cm-activeLine { background: rgba(239,109,76,.035); }
+.live-preview-editor .cm-preview-heading { padding-block: .22em; color: #182237; font-family: Georgia, "Times New Roman", serif; font-weight: 700; line-height: 1.28; text-decoration: none; }
+.live-preview-editor .cm-preview-heading * { text-decoration: none !important; }
+.live-preview-editor .cm-preview-heading-1 { font-size: 1.78em; }
+.live-preview-editor .cm-preview-heading-2 { font-size: 1.5em; }
+.live-preview-editor .cm-preview-heading-3 { font-size: 1.3em; }
+.live-preview-editor .cm-preview-heading-4 { font-size: 1.14em; }
+.live-preview-editor .cm-preview-heading-5 { font-size: 1.04em; }
+.live-preview-editor .cm-preview-heading-6 { color: #4f596b; font-size: .96em; text-transform: uppercase; letter-spacing: .04em; }
+.live-preview-editor .cm-preview-blockquote { padding-left: 12px; border-left: 3px solid #c7c1b5; color: #626b78; }
+.live-preview-editor .cm-preview-inline-code { padding: .08em .28em; border-radius: 4px; background: #eeeae2; color: #b34d3c; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .9em; }
+.live-preview-editor .cm-preview-code-block { padding-inline: 10px; background: #f1eee8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .9em; }
+.live-preview-editor .cm-preview-horizontal-rule { height: 1.5em; border-top: 1px solid #d5d0c5; color: transparent; font-size: 0; }
+.live-preview-editor .cm-preview-list-bullet { color: #4f596b; font-family: ui-sans-serif, sans-serif; }
 .live-preview-editor .cm-selectionBackground,
 .live-preview-editor .cm-focused .cm-selectionBackground { background: rgba(95,133,191,.2) !important; }
 .live-preview-editor .cm-placeholder { color: #a3a7ad; white-space: pre-line; }

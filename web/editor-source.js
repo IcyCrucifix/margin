@@ -2,7 +2,7 @@ import { autocompletion, closeCompletion, completionKeymap, startCompletion } fr
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { EditorState, StateEffect, StateField } from "@codemirror/state";
+import { EditorState, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -19,6 +19,7 @@ import { browserAdaptor } from "@mathjax/src/mjs/adaptors/browserAdaptor.js";
 import { RegisterHTMLHandler } from "@mathjax/src/mjs/handlers/html.js";
 import "@mathjax/src/mjs/input/tex/ams/AmsConfiguration.js";
 import "@mathjax/src/mjs/input/tex/newcommand/NewcommandConfiguration.js";
+import { liveMarkdown, setLivePreviewFocused } from "./live-markdown.js";
 
 const adaptor = browserAdaptor();
 RegisterHTMLHandler(adaptor);
@@ -123,12 +124,14 @@ function parseMath(text) {
   return ranges;
 }
 
-function selectionTouches(range, selection) {
-  return selection.ranges.some((selected) => (
-    selected.empty
-      ? selected.head >= range.from && selected.head < range.to
-      : selected.from < range.to && selected.to > range.from
-  ));
+function selectionTouchesLine(range, state) {
+  const firstRangeLine = state.doc.lineAt(range.from).number;
+  const lastRangeLine = state.doc.lineAt(range.to).number;
+  return state.selection.ranges.some((selected) => {
+    const firstSelectedLine = state.doc.lineAt(selected.from).number;
+    const lastSelectedLine = state.doc.lineAt(selected.to).number;
+    return firstSelectedLine <= lastRangeLine && lastSelectedLine >= firstRangeLine;
+  });
 }
 
 class MathWidget extends WidgetType {
@@ -174,19 +177,18 @@ class MathWidget extends WidgetType {
 function mathDecorations(state, focused) {
   const text = state.doc.toString();
   const replacements = parseMath(text)
-    .filter((range) => !focused || !selectionTouches(range, state.selection))
+    .filter((range) => !focused || !selectionTouchesLine(range, state))
     .map((range) => Decoration.replace({ widget: new MathWidget(range) }).range(range.from, range.to));
   return Decoration.set(replacements, true);
 }
 
-const setMathEditorFocus = StateEffect.define();
 const liveMath = StateField.define({
   create: (state) => ({ focused: false, decorations: mathDecorations(state, false) }),
   update(value, transaction) {
     let focused = value.focused;
     let focusChanged = false;
     for (const effect of transaction.effects) {
-      if (effect.is(setMathEditorFocus)) {
+      if (effect.is(setLivePreviewFocused)) {
         focused = effect.value;
         focusChanged = focused !== value.focused;
       }
@@ -198,13 +200,13 @@ const liveMath = StateField.define({
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 });
 
-const liveMathInteraction = EditorView.domEventHandlers({
+const livePreviewInteraction = EditorView.domEventHandlers({
   focus(_event, view) {
-    view.dispatch({ effects: setMathEditorFocus.of(true) });
+    view.dispatch({ effects: setLivePreviewFocused.of(true) });
     return false;
   },
   blur(_event, view) {
-    view.dispatch({ effects: setMathEditorFocus.of(false) });
+    view.dispatch({ effects: setLivePreviewFocused.of(false) });
     return false;
   },
   mousedown(event, view) {
@@ -337,8 +339,9 @@ function createEditor({ parent, onChange, onSave, onBlur }) {
       autocompletion({ override: [latexCompletionSource], activateOnTyping: true }),
       keymap.of([saveBinding, indentWithTab, ...completionKeymap, ...defaultKeymap, ...historyKeymap]),
       placeholder("Capture the idea, question, or formula for this page…\n\nType \\ to suggest LaTeX symbols."),
+      liveMarkdown,
       liveMath,
-      liveMathInteraction,
+      livePreviewInteraction,
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return;
         if (!suppressChange) onChange?.(update.state.doc.toString());
