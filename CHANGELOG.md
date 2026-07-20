@@ -37,10 +37,14 @@ Version 1.1.0 strengthened everyday reading and note-taking, introduced bilingua
 
 - Made uploads with the same complete filename share their page notes, including future edits on pages present in each matching upload.
 - Added a keyboard-shortcuts dialog and improved keyboard-driven navigation.
-- Added English and Simplified Chinese interface switching.
 - Added per-lecture polished-note language selection and the ability to request a new polished version in another supported language.
 - Added a public Margin product site and a GitHub Pages build/deployment workflow.
 - Added a strict public-artifact allowlist so private configuration, notes, and local runtime data cannot enter the Pages bundle.
+
+### New languages
+
+- Added Simplified Chinese as a complete interface language alongside English.
+- Added Simplified Chinese polished-note output, including the ability to repolish an existing lecture in the selected language.
 
 ### Bug fixes
 
@@ -74,6 +78,6 @@ The original local development commits were consolidated into the public-release
 
 ## History coverage
 
-The complete reachable GitHub history was reviewed to reconstruct this blog. Commits, pushes, pull requests, merges, branch synchronizations, documentation-only edits, and wording-only edits are not counted as product updates by themselves. A changelog entry is included only when the repository history shows a new feature or a bug fix.
+The complete reachable GitHub history was reviewed to reconstruct this blog. Commits, pushes, pull requests, merges, branch synchronizations, documentation-only edits, and wording-only edits are not counted as product updates by themselves. A changelog entry is included when the repository history shows a new feature, a bug fix, a newly supported language, or a newly translated public artifact such as a README.
 
 Git records commits and merges, not the exact time or command used for each `git push`, so unavailable push-event timestamps are not invented here.
