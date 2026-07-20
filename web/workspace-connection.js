@@ -78,22 +78,27 @@
   async function connect() {
     elements.connect.disabled = true;
     elements.status.classList.remove("error");
-    elements.status.textContent = "Checking the local Margin companion…";
-    const popup = window.open("about:blank", "margin-local-connect", "width=540,height=650");
+    elements.status.textContent = "Opening your installed local Margin…";
+    const challenge = randomChallenge();
+    const query = new URLSearchParams({ origin: window.location.origin, challenge });
+    const popup = window.open(
+      `${window.MarginApi.apiBase}/connect?${query}`,
+      "margin-local-connect",
+      "width=540,height=650",
+    );
     if (!popup) {
       showGate("Allow pop-ups for this connection request, then try again.", true);
       return;
     }
+    let pairingApproved = false;
     try {
+      const token = await waitForPairing(popup, challenge);
+      pairingApproved = true;
+      window.MarginApi.setSessionToken(token);
       const companion = await window.MarginApi.request("/api/connect/status");
       if (companion.protocol_version !== EXPECTED_PROTOCOL_VERSION) {
         throw new Error("Update the local Margin companion before connecting.");
       }
-      const challenge = randomChallenge();
-      const query = new URLSearchParams({ origin: window.location.origin, challenge });
-      popup.location.href = `${window.MarginApi.apiBase}/connect?${query}`;
-      const token = await waitForPairing(popup, challenge);
-      window.MarginApi.setSessionToken(token);
       await window.MarginApi.request("/api/health");
       showWorkspace();
       await onConnected();
@@ -101,9 +106,11 @@
       popup.close();
       window.MarginApi.clearSessionToken();
       const unreachable = error instanceof TypeError || error.message === "Failed to fetch";
-      const message = unreachable
-        ? "Local Margin could not be reached. Start it and allow local-network access, then try again."
-        : error.message;
+      const message = unreachable && pairingApproved
+        ? "Connection was approved, but Chrome could not access local Margin. Allow Local Network Access for this site, then try again."
+        : unreachable
+          ? "Local Margin could not be reached. Start your installed local Margin, then try again."
+          : error.message;
       showGate(message || "Local Margin could not be reached.", true);
     }
   }
