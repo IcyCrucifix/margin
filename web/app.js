@@ -855,11 +855,11 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keydown", (event) => {
   if (!state.active || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
   if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
-  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   if (isEditingTarget(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
-  goToPage(state.page + (event.key === "ArrowRight" ? 1 : -1));
+  goToPage(state.page + (event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1));
 }, { capture: true });
 window.addEventListener("resize", applyZoom);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNow(); });
