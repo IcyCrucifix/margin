@@ -12,7 +12,7 @@ const workspaceFiles = [
   "app.js",
   "connection.css",
   "editor-bundle.js",
-  "folder-import.js",
+  "source-access.js",
   "folder-tree.css",
   "folder-tree.js",
   "i18n.js",

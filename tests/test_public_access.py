@@ -99,6 +99,7 @@ class PublicAccessIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(status, 204)
         self.assertEqual(headers["Access-Control-Allow-Private-Network"], "true")
+        self.assertIn("DELETE", headers["Access-Control-Allow-Methods"])
 
         status, _, _ = self.request(
             "/api/connect/status", headers={"Origin": "https://example.com"}

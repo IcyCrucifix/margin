@@ -2,7 +2,7 @@
 
 This page describes the optional Obsidian integration. Users who do not use Obsidian should start with [storage.md](storage.md); plain-folder mode keeps the same files but uses ordinary Markdown links.
 
-In Obsidian mode, the vault **is** the store: every import, memo, and polished note becomes a plain file in the vault, readable and linkable without an Obsidian plugin.
+In Obsidian mode, the vault stores Margin's raw notes, polished notes, extracted text, and library metadata as plain files. Selected lecture sources stay at their existing filesystem paths and are linked from the vault without being copied or moved.
 
 ## The vault contract
 
@@ -12,18 +12,18 @@ In Obsidian mode, the vault **is** the store: every import, memo, and polished n
 
 ## Files created per lecture
 
-Importing a `.pdf`/`.pptx` produces four artifacts:
+Opening a `.pdf`/`.pptx` registers one source reference and produces note artifacts:
 
 | Artifact | Central location (default) | Purpose |
 |---|---|---|
-| Source copy | `Lecture Notes/_Sources/<course>/<date> - <title> - <id6>.pdf` | byte-for-byte copy of the lecture file; never modified |
+| Source reference | original selected path | read in place; never copied, moved, or deleted by Margin |
 | Raw note | `Lecture Notes/Raw/<course>/<date> - <title> - Raw Notes.md` | your page-linked class memos |
 | Extracted text | `Lecture Notes/.content-reader/extracted/<id>.md` | machine-extracted page text, one `## Page N` per page, used by Stage 2 |
 | Polished note | `Lecture Notes/Polished/<course>/<date> - <title> - Polished.md` | created later by Stage 2 ([polish.md](polish.md)) |
 
 Plus two vault-wide files:
 
-- `Lecture Notes/.content-reader/library.json` — the index. Each record holds `id` (16-hex digest of course+title+file hash), paths of the four artifacts, `page_count`, `source_sha256`, timestamps, and `polished_input_hash` once polished. Re-importing the same course+title+file is a no-op returning the existing record.
+- `Lecture Notes/.content-reader/library.json` — the index. Each record holds `id` (16-hex digest of course+title+file hash), source references and display paths, note paths, `page_count`, `source_sha256`, timestamps, and `polished_input_hash` once polished. Opening the same course+title+file returns the existing record.
 - `Lecture Notes/Lecture Notes Hub.md` — a human-facing index note, one table per course with wiki links to raw/polished/source. Regenerated after every change.
 
 ## Raw note format (the sync-critical part)
@@ -34,7 +34,7 @@ The raw note is a normal Obsidian Markdown file with YAML frontmatter (`content_
 ## Page 3
 ^page-3
 
-![[Lecture Notes/_Sources/COMP1010/2026-07-13 - Caches - a1b2c3.pdf#page=3]]
+[Open original PDF at page 3](file:///Users/example/Lectures/Caches.pdf#page=3)
 
 ### Class notes
 <!-- content-reader:page:3:start -->
@@ -46,7 +46,7 @@ Rules the app enforces:
 
 - **Memos live only between the marker comments.** Saving a page memo replaces exactly the text between its `start`/`end` markers, atomically (temp file + rename). Everything else in the file — including anything you type outside the markers in Obsidian — is preserved verbatim.
 - Memo content may not contain the string `<!-- content-reader:` (reserved for synchronization).
-- PDF pages are embedded with `![[source#page=N]]` so Obsidian shows the exact page above each memo; PPTX raw notes link to the original file once instead.
+- Referenced PDF pages use local `file:` links with `#page=N`; PPTX raw notes link to the original file once. Legacy managed-copy records retain their existing Obsidian embeds.
 - `^page-N` block anchors let other notes deep-link to a page's memos.
 - When Stage 2 installs a polished note, the raw note's `status: raw` flips to `status: polished-available`; raw and polished notes carry two-way wiki links.
 
@@ -63,11 +63,11 @@ With `route_to_existing_course_folder: true`, Margin scans the vault (outside it
 
 The shallowest match wins. If no folder matches (or routing is off), the central layout above is used. The hub indexes both locations.
 
-**Reconciliation:** every Stage 2 run (manual, pending batch, or automatic) first calls `reconcile_course_locations()`. If you have since created or renamed a course folder, the affected source/raw/polished files are moved to the new destination and every wiki link inside the raw, polished, and extracted notes is rewritten to the new paths. A move is refused (with an error, no data loss) if the destination already contains a *different* file with the same name.
+**Reconciliation:** every Stage 2 run (manual, pending batch, or automatic) first calls `reconcile_course_locations()`. If you have since created or renamed a course folder, only raw and polished notes are moved to the new destination and their internal links are repaired. Referenced lecture sources remain at their original paths. Legacy managed source copies retain the previous relocation behavior.
 
 ## Guarantees
 
-- Source files are copied byte-for-byte and never rewritten; memos are the only region tooling edits, and only between markers.
+- Source files are read in place and never copied, moved, rewritten, or deleted; memos are the only note region tooling edits, and only between markers.
 - All Markdown/JSON writes are atomic (`tempfile` + `os.replace`) — a crash cannot leave a half-written note.
 - Everything is plain Markdown with `$…$` / `$$…$$` math — the vault stays fully usable if you stop using Margin.
 - Page images and Stage-2 drafts are cached under the project's `runtime/` folder, **outside** the vault, so sync tools (Obsidian Sync, iCloud, git) never see render caches.

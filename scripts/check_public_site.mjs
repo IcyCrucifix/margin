@@ -19,7 +19,7 @@ const requiredFiles = [
   "workspace/app.js",
   "workspace/connection.css",
   "workspace/editor-bundle.js",
-  "workspace/folder-import.js",
+  "workspace/source-access.js",
   "workspace/folder-tree.css",
   "workspace/folder-tree.js",
   "workspace/i18n.js",

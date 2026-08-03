@@ -2,8 +2,10 @@
   const expandedPaths = new Set();
   const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
-  function importPaths(document) {
-    const stored = Array.isArray(document.import_paths) ? document.import_paths : [];
+  function libraryPaths(document) {
+    const stored = Array.isArray(document.library_paths)
+      ? document.library_paths
+      : Array.isArray(document.import_paths) ? document.import_paths : [];
     const paths = stored.filter((path) => typeof path === "string" && path.trim());
     return [...new Set(paths.length ? paths : [document.filename || document.title])];
   }
@@ -23,7 +25,7 @@
     const query = search.trim().toLocaleLowerCase();
     const root = newFolder();
     documents.forEach((document) => {
-      importPaths(document).forEach((path) => {
+      libraryPaths(document).forEach((path) => {
         if (!matches(document, path, query)) return;
         const parts = path.replaceAll("\\", "/").split("/").filter(Boolean);
         if (!parts.length) return;
@@ -61,6 +63,8 @@
   }
 
   function renderFile(entry, depth, options) {
+    const row = document.createElement("div");
+    row.className = "file-tree-row";
     const button = document.createElement("button");
     const lecture = entry.document;
     button.type = "button";
@@ -82,12 +86,27 @@
     note.className = `note-pip${lecture.has_notes ? " has-notes" : ""}`;
     button.append(icon, copy, note);
     button.addEventListener("click", () => options.onSelect(lecture.id));
+    const remove = removeButton(options, () => options.onRemove(entry));
+    row.append(button, remove);
+    return row;
+  }
+
+  function removeButton(options, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "file-tree-remove";
+    button.textContent = "×";
+    button.title = options.removeLabel;
+    button.setAttribute("aria-label", options.removeLabel);
+    button.addEventListener("click", onClick);
     return button;
   }
 
   function renderFolder(folder, depth, options) {
     const section = document.createElement("section");
     section.className = "file-tree-folder";
+    const row = document.createElement("div");
+    row.className = "file-tree-row";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "file-tree-folder-button";
@@ -109,9 +128,11 @@
       else expandedPaths.delete(folder.path);
     });
 
+    const remove = removeButton(options, () => options.onRemove(folder));
+    row.append(button, remove);
     folder.folders.forEach((child) => children.append(renderFolder(child, depth + 1, options)));
     folder.files.forEach((file) => children.append(renderFile(file, depth + 1, options)));
-    section.append(button, children);
+    section.append(row, children);
     return section;
   }
 
@@ -122,5 +143,5 @@
     return fileCount(tree);
   }
 
-  globalThis.MarginFolderTree = Object.freeze({ buildTree, fileCount, importPaths, render });
+  globalThis.MarginFolderTree = Object.freeze({ buildTree, fileCount, libraryPaths, render });
 })();

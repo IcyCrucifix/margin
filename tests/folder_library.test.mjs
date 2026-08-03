@@ -55,16 +55,11 @@ test("folder-tree search matches path segments and prunes unrelated files", asyn
   assert.equal(tree.folders[0].folders[0].name, "Review");
 });
 
-test("folder import selects supported files recursively", async () => {
-  const context = await loadBrowserModule(new URL("../web/folder-import.js", import.meta.url));
-  const files = [
-    { name: "notes.txt", webkitRelativePath: "Course/Week 1/notes.txt" },
-    { name: "slides.PPTX", webkitRelativePath: "Course/Week 2/slides.PPTX" },
-    { name: "lecture.pdf", webkitRelativePath: "Course/Week 1/lecture.pdf" },
-  ];
+test("prefers canonical library paths while retaining old records", async () => {
+  const context = await loadBrowserModule(new URL("../web/folder-tree.js", import.meta.url));
+  const current = { filename: "new.pdf", library_paths: ["Current/new.pdf"], import_paths: ["Old/new.pdf"] };
+  const legacy = { filename: "old.pdf", import_paths: ["Legacy/old.pdf"] };
 
-  const selected = context.MarginFolderImport.filesForImport(files);
-  assert.deepEqual([...selected].map(({ name }) => name), ["lecture.pdf", "slides.PPTX"]);
-  assert.equal(context.MarginFolderImport.rootNameFor(selected), "Course");
-  assert.equal(context.MarginFolderImport.titleFor(selected[0]), "lecture");
+  assert.deepEqual([...context.MarginFolderTree.libraryPaths(current)], ["Current/new.pdf"]);
+  assert.deepEqual([...context.MarginFolderTree.libraryPaths(legacy)], ["Legacy/old.pdf"]);
 });

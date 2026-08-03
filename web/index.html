@@ -18,8 +18,8 @@
     <script src="./i18n.js?v=20260720-public3" defer></script>
     <script src="./workspace-connection.js?v=20260720-public3" defer></script>
     <script src="./folder-tree.js?v=20260803-folder1" defer></script>
-    <script src="./folder-import.js?v=20260803-folder1" defer></script>
-    <script src="./app.js?v=20260803-folder1" defer></script>
+    <script src="./source-access.js?v=20260803-access1" defer></script>
+    <script src="./app.js?v=20260803-access1" defer></script>
   </head>
   <body>
     <section class="connection-gate" id="connectionGate" aria-labelledby="connectionTitle" hidden>
@@ -47,19 +47,13 @@
           </div>
         </div>
 
-        <button class="open-button" id="openFileButton" type="button" data-i18n-aria-label="open.lecture">
-          <span aria-hidden="true">＋</span> <span data-i18n="open.lecture">Open lecture</span>
-        </button>
-        <button class="open-folder-button" id="openFolderButton" type="button" data-i18n-aria-label="folder.open">
-          <span aria-hidden="true">▰</span> <span data-i18n="folder.open">Open folder</span>
+        <button class="open-button" id="openFileButton" type="button" data-i18n-aria-label="access.open">
+          <span aria-hidden="true">＋</span> <span data-i18n="access.open">Open file or folder</span>
         </button>
         <button class="batch-button" id="polishPendingButton" type="button" disabled>
           <span aria-hidden="true">✦</span>
           <span><strong data-i18n="polish.pending">Polish pending</strong><small id="autoPolishStatus" data-i18n="polish.manual_batch">Manual batch</small></span>
         </button>
-        <input id="fileInput" type="file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
-        <input id="folderInput" type="file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" webkitdirectory hidden />
-
         <label class="search-box">
           <span class="sr-only" data-i18n="library.filter">Search Library</span>
           <span aria-hidden="true">⌕</span>
@@ -120,7 +114,7 @@
           <h2><span data-i18n="reader.empty_heading">Your lecture on one side.
 Your thinking on the other.</span></h2>
           <p data-i18n="reader.empty_description">Open a PDF or PowerPoint. Every memo is saved under its exact page in your configured notes workspace, without changing the original file.</p>
-          <button class="primary-button" id="emptyOpenButton" type="button" data-i18n="reader.choose_lecture">Choose a lecture</button>
+          <button class="primary-button" id="emptyOpenButton" type="button" data-i18n="access.choose">Choose a file or folder</button>
           <div class="drop-hint" id="dropHint" data-i18n="reader.drop_hint">or drop a .pdf / .pptx anywhere</div>
         </section>
 
@@ -185,20 +179,20 @@ Your thinking on the other.</span></h2>
         <div class="dialog-heading">
           <div>
             <span class="eyebrow" data-i18n="folder.eyebrow">ADD A FOLDER TREE</span>
-            <h2 data-i18n="folder.heading">Import lecture folder</h2>
+            <h2 data-i18n="folder.heading">Open lecture folder</h2>
           </div>
-          <button class="icon-button" value="cancel" type="submit" data-i18n-aria-label="import.close" aria-label="Close">×</button>
+          <button class="icon-button" value="cancel" type="submit" formnovalidate data-i18n-aria-label="import.close" aria-label="Close">×</button>
         </div>
         <div class="folder-pill">
           <span class="folder-pill-icon" aria-hidden="true">▰</span>
           <div><strong id="folderName"></strong><span id="folderSummary"></span></div>
         </div>
         <label><span data-i18n="folder.course">Course for this folder</span><input id="folderCourse" required data-i18n-placeholder="folder.course_placeholder" placeholder="e.g. ELEC2441" autocomplete="off" /></label>
-        <p class="dialog-note" data-i18n="folder.note">Margin imports every PDF and PowerPoint in this folder and its subfolders. Other file types stay untouched.</p>
+        <p class="dialog-note" data-i18n="folder.note">Margin accesses every PDF and PowerPoint in this folder and its subfolders without copying or moving source files.</p>
         <p class="folder-progress" id="folderProgress" role="status" aria-live="polite" hidden></p>
         <div class="dialog-actions">
-          <button id="folderCancel" value="cancel" type="submit" class="secondary-button" data-i18n="import.cancel">Cancel</button>
-          <button id="folderSubmit" value="default" type="submit" class="primary-button" data-i18n="folder.submit">Import folder</button>
+          <button id="folderCancel" value="cancel" type="submit" formnovalidate class="secondary-button" data-i18n="import.cancel">Cancel</button>
+          <button id="folderSubmit" value="default" type="submit" class="primary-button" data-i18n="access.folder_submit">Open folder</button>
         </div>
       </form>
     </dialog>
@@ -207,10 +201,10 @@ Your thinking on the other.</span></h2>
       <form method="dialog" id="importForm">
         <div class="dialog-heading">
           <div>
-            <span class="eyebrow" data-i18n="import.eyebrow">ADD TO LECTURE LIBRARY</span>
-            <h2 data-i18n="import.heading">Sort this lecture</h2>
+            <span class="eyebrow" data-i18n="access.eyebrow">OPEN IN LECTURE LIBRARY</span>
+            <h2 data-i18n="access.heading">Open this lecture</h2>
           </div>
-          <button class="icon-button" value="cancel" type="submit" data-i18n-aria-label="import.close" aria-label="Close">×</button>
+          <button class="icon-button" value="cancel" type="submit" formnovalidate data-i18n-aria-label="import.close" aria-label="Close">×</button>
         </div>
         <div class="file-pill">
           <span class="file-kind" id="importFileKind">PDF</span>
@@ -219,10 +213,10 @@ Your thinking on the other.</span></h2>
         <label><span data-i18n="import.course">Course</span><input id="importCourse" required data-i18n-placeholder="import.course_placeholder" placeholder="e.g. ELEC2441" autocomplete="off" /></label>
         <label><span data-i18n="import.title">Lecture title</span><input id="importTitle" required data-i18n-placeholder="import.title_placeholder" placeholder="e.g. Cache Memory" autocomplete="off" /></label>
         <label><span data-i18n="import.date">Lecture date</span><input id="importDate" required type="date" /></label>
-        <p class="dialog-note" data-i18n="import.note">The source is copied untouched. Notes are written separately inside your configured notes workspace.</p>
+        <p class="dialog-note" data-i18n="access.note">Margin accesses this source in its current location. Only raw and polished notes are written to your configured notes workspace.</p>
         <div class="dialog-actions">
-          <button value="cancel" type="submit" class="secondary-button" data-i18n="import.cancel">Cancel</button>
-          <button id="importSubmit" value="default" type="submit" class="primary-button" data-i18n="import.submit">Import lecture</button>
+          <button value="cancel" type="submit" formnovalidate class="secondary-button" data-i18n="import.cancel">Cancel</button>
+          <button id="importSubmit" value="default" type="submit" class="primary-button" data-i18n="access.submit">Open lecture</button>
         </div>
       </form>
     </dialog>
@@ -245,7 +239,7 @@ Your thinking on the other.</span></h2>
           <label><input id="interfaceOnlyScope" type="radio" name="languageScope" value="interface" checked /> <span data-i18n="language.interface_only">Interface only</span></label>
           <label id="polishedNoteLanguageScope"><input id="interfaceAndNotesScope" type="radio" name="languageScope" value="interface-and-notes" /> <span data-i18n="language.interface_and_notes">Interface + polished notes</span></label>
         </fieldset>
-        <p class="dialog-note" id="languageContextNote" data-i18n="language.no_active_note">No lecture is selected; this sets the default for future imports.</p>
+        <p class="dialog-note" id="languageContextNote" data-i18n="language.no_active_note">No lecture is selected; this sets the default for files opened later.</p>
         <div class="dialog-actions">
           <button value="cancel" type="submit" class="secondary-button" data-i18n="import.cancel">Cancel</button>
           <button id="languageApply" value="default" type="submit" class="primary-button" data-i18n="language.apply">Apply</button>

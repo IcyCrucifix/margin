@@ -30,6 +30,8 @@ from .public_access import (
     PublicAccessError,
     PublicSessionRegistry,
 )
+from .source_access import inspect_source_selection, normalize_source_paths
+from .source_picker import SourcePickerCancelled, choose_source_path
 from .store import DEFAULT_CONFIG_PATH, PROJECT_ROOT, StoreError, VaultStore
 
 
@@ -267,6 +269,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             traceback.print_exc()
             self._json({"error": "Unexpected local server error."}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def do_DELETE(self) -> None:
+        try:
+            self._require_public_api_access()
+            self._require_local_mutation()
+            self._do_delete()
+        except PublicAccessError as exc:
+            self._json({"error": str(exc)}, exc.status)
+        except StoreError as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        except Exception:
+            traceback.print_exc()
+            self._json({"error": "Unexpected local server error."}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
     def do_OPTIONS(self) -> None:
         origin = self.headers.get("Origin", "")
         if origin != PUBLIC_MARGIN_ORIGIN:
@@ -274,7 +289,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._send_cors_headers()
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Margin-Session")
         self.send_header("Access-Control-Max-Age", "600")
         if self.headers.get("Access-Control-Request-Private-Network") == "true":
@@ -381,6 +396,42 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.server.public_sessions.revoke(self.headers.get("X-Margin-Session"), origin)
             self._json({"disconnected": True})
             return
+        if path == "/api/source-picker":
+            try:
+                selection = inspect_source_selection(choose_source_path())
+            except SourcePickerCancelled:
+                self._json({"cancelled": True})
+                return
+            except ValueError as exc:
+                raise StoreError(str(exc)) from exc
+            self._json({"selection": selection.as_payload()})
+            return
+        if path == "/api/source-access/inspect":
+            payload = self._read_json()
+            try:
+                paths = normalize_source_paths(payload.get("paths", []))
+                selection = inspect_source_selection(paths[0])
+            except ValueError as exc:
+                raise StoreError(str(exc)) from exc
+            self._json({"selection": selection.as_payload()})
+            return
+        if path == "/api/library/access":
+            payload = self._read_json()
+            source_path = str(payload.get("source_path", "")).strip()
+            library_path = str(payload.get("library_path", "")).strip()
+            if not source_path or not library_path:
+                raise StoreError("Source path and library path are required.")
+            with self.server.store_lock:
+                record = self.server.store.access_document(
+                    source_path=source_path,
+                    library_path=library_path,
+                    course=str(payload.get("course", "")),
+                    title=str(payload.get("title", "")),
+                    lecture_date=str(payload.get("date", "")) or None,
+                    polished_note_language=str(payload.get("polished_note_language", "en")),
+                )
+            self._json({"document": record}, HTTPStatus.CREATED)
+            return
         if path == "/api/import":
             query = urllib.parse.parse_qs(parsed.query)
             filename = self._query_value(query, "filename")
@@ -418,6 +469,22 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._json(result, HTTPStatus.ACCEPTED if result.get("status") == "running" else HTTPStatus.OK)
             return
         raise StoreError("Unknown action.")
+
+    def _do_delete(self) -> None:
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path != "/api/library/access":
+            raise StoreError("Unknown action.")
+        query = urllib.parse.parse_qs(parsed.query)
+        library_path = self._query_value(query, "library_path")
+        kind = self._query_value(query, "kind")
+        document_id = query.get("document_id", [None])[0]
+        with self.server.store_lock:
+            result = self.server.store.remove_library_access(
+                document_id=document_id,
+                library_path=library_path,
+                kind=kind,
+            )
+        self._json(result)
 
     def _do_put(self) -> None:
         parsed = urllib.parse.urlparse(self.path)

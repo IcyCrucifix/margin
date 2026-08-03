@@ -4,7 +4,6 @@ const state = {
   page: 1,
   notes: {},
   zoom: 1,
-  pendingFile: null,
   saveTimer: null,
   savedValue: "",
   jobPoll: null,
@@ -30,8 +29,7 @@ const FALLBACK_LANGUAGE_OPTIONS = Object.freeze([
 ]);
 const TOAST_FADE_DURATION_MS = 240;
 const elements = {
-  openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"), fileInput: $("#fileInput"),
-  openFolderButton: $("#openFolderButton"), folderInput: $("#folderInput"),
+  openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"),
   polishPendingButton: $("#polishPendingButton"), autoPolishStatus: $("#autoPolishStatus"),
   librarySearch: $("#librarySearch"), lectureList: $("#lectureList"), lectureCount: $("#lectureCount"),
   vaultStatusCard: $("#vaultStatusCard"), vaultStatusText: $("#vaultStatusText"), vaultLabel: $("#vaultLabel"),
@@ -111,6 +109,13 @@ async function loadLibrary(preferredId = null) {
   const id = preferredId || state.active?.id;
   const chosen = id && documents.find((item) => item.id === id);
   if (chosen) await selectDocument(chosen.id, false);
+  else if (state.active && !documents.some((item) => item.id === state.active.id)) {
+    state.active = null;
+    state.notes = {};
+    elements.readerLayout.hidden = true;
+    elements.pageCounter.hidden = true;
+    elements.emptyState.hidden = false;
+  }
 }
 
 async function checkVaultConnection() {
@@ -176,7 +181,24 @@ function renderLibrary() {
     expandAll: Boolean(query),
     formatDate,
     onSelect: selectDocument,
+    onRemove: removeLibraryEntry,
+    removeLabel: t("library.remove"),
   });
+}
+
+async function removeLibraryEntry(entry) {
+  const key = entry.kind === "folder" ? "library.remove_folder_confirm" : "library.remove_file_confirm";
+  if (!window.confirm(t(key, { name: entry.name }))) return;
+  if (entry.document?.id === state.active?.id) await saveNow();
+  const params = new URLSearchParams({ kind: entry.kind, library_path: entry.path });
+  if (entry.document?.id) params.set("document_id", entry.document.id);
+  try {
+    await api(`/api/library/access?${params}`, mutateOptions({ method: "DELETE" }));
+    await loadLibrary();
+    showToast(t("library.removed", { name: entry.name }));
+  } catch (error) {
+    showToast(error.message, true, 7000);
+  }
 }
 
 function formatDate(value) {
@@ -424,20 +446,6 @@ function applyZoom() {
   elements.pageImage.style.width = `${available * state.zoom}px`;
 }
 
-function chooseFile(file) {
-  if (!window.MarginApi.hasSession()) return;
-  if (!file) return;
-  const extension = file.name.split(".").pop().toLowerCase();
-  if (!["pdf", "pptx"].includes(extension)) return showToast(t("toast.file_type"), true);
-  state.pendingFile = file;
-  elements.importFileKind.textContent = extension.toUpperCase();
-  elements.importFileName.textContent = file.name;
-  elements.importFileSize.textContent = `${(file.size / 1024 / 1024).toFixed(file.size > 10_000_000 ? 1 : 2)} MB`;
-  elements.importTitle.value = file.name.replace(/\.(pdf|pptx)$/i, "").replace(/[_-]+/g, " ");
-  elements.importDate.value = new Date().toLocaleDateString("en-CA");
-  elements.importDialog.showModal();
-}
-
 const DEFAULT_NOTE_LANGUAGE_KEY = "margin.defaultPolishedNoteLanguage";
 
 async function loadLanguageOptions() {
@@ -593,39 +601,6 @@ async function chooseLanguageUpdate(apply) {
 
 function closeLanguageConfirmation() {
   state.pendingLanguageChange = null;
-}
-
-async function importLecture(event) {
-  event.preventDefault();
-  if (event.submitter?.value === "cancel") {
-    elements.importDialog.close();
-    state.pendingFile = null;
-    elements.fileInput.value = "";
-    return;
-  }
-  if (!state.pendingFile || !elements.importForm.reportValidity()) return;
-  const params = new URLSearchParams({
-    filename: state.pendingFile.name,
-    course: elements.importCourse.value,
-    title: elements.importTitle.value,
-    date: elements.importDate.value,
-    polished_note_language: defaultNoteLanguage(),
-  });
-  elements.importSubmit.disabled = true;
-  elements.importSubmit.textContent = t("import.reading_pages");
-  try {
-    const { document } = await api(`/api/import?${params}`, mutateOptions({ method: "POST", body: state.pendingFile }));
-    elements.importDialog.close();
-    showToast(t("import.ready", { title: document.title }));
-    state.pendingFile = null;
-    elements.fileInput.value = "";
-    await loadLibrary(document.id);
-  } catch (error) {
-    showToast(error.message, true, 7000);
-  } finally {
-    elements.importSubmit.disabled = false;
-    elements.importSubmit.textContent = t("import.submit");
-  }
 }
 
 function formatSelection(button) {
@@ -798,15 +773,6 @@ function pollJob(jobId, batch = false) {
   }, 2500);
 }
 
-elements.openFileButton.addEventListener("click", () => elements.fileInput.click());
-elements.emptyOpenButton.addEventListener("click", () => elements.fileInput.click());
-elements.fileInput.addEventListener("change", () => chooseFile(elements.fileInput.files[0]));
-elements.importForm.addEventListener("submit", importLecture);
-elements.importDialog.addEventListener("close", () => {
-  if (elements.importSubmit.disabled) return;
-  state.pendingFile = null;
-  elements.fileInput.value = "";
-});
 elements.librarySearch.addEventListener("input", renderLibrary);
 elements.vaultStatusCard.addEventListener("click", checkVaultConnection);
 elements.languageButton.addEventListener("click", openLanguageDialog);
@@ -870,28 +836,28 @@ for (const eventName of ["dragenter", "dragover"]) {
 for (const eventName of ["dragleave", "drop"]) {
   document.addEventListener(eventName, (event) => { event.preventDefault(); elements.emptyState.classList.remove("dragging"); });
 }
-document.addEventListener("drop", (event) => chooseFile(event.dataTransfer?.files?.[0]));
+document.addEventListener("drop", () => showToast(t("access.use_open"), true));
 
 if (!window.MarginEditor) throw new Error("The notes editor could not be loaded.");
-if (!window.MarginFolderTree || !window.MarginFolderImport) throw new Error("The folder library could not be loaded.");
-window.MarginFolderImport.initialize({
+if (!window.MarginFolderTree || !window.MarginSourceAccess) throw new Error("The folder library could not be loaded.");
+window.MarginSourceAccess.initialize({
   elements: {
-    button: elements.openFolderButton,
-    input: elements.folderInput,
-    dialog: elements.folderDialog,
-    form: elements.folderForm,
-    name: elements.folderName,
-    summary: elements.folderSummary,
-    course: elements.folderCourse,
-    progress: elements.folderProgress,
-    submit: elements.folderSubmit,
-    cancel: elements.folderCancel,
+    buttons: [elements.openFileButton, elements.emptyOpenButton],
+    fileDialog: elements.importDialog, fileForm: elements.importForm,
+    fileKind: elements.importFileKind, fileName: elements.importFileName,
+    fileSize: elements.importFileSize, fileCourse: elements.importCourse,
+    fileTitle: elements.importTitle, fileDate: elements.importDate,
+    fileSubmit: elements.importSubmit,
+    folderDialog: elements.folderDialog, folderForm: elements.folderForm,
+    folderName: elements.folderName, folderSummary: elements.folderSummary,
+    folderCourse: elements.folderCourse, folderProgress: elements.folderProgress,
+    folderSubmit: elements.folderSubmit, folderCancel: elements.folderCancel,
   },
   hasSession: () => window.MarginApi.hasSession(),
   request: api,
   mutationOptions: mutateOptions,
   defaultNoteLanguage,
-  onImported: loadLibrary,
+  onAccessed: loadLibrary,
   showToast,
   t,
 });

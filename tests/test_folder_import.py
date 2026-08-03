@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from content_reader.import_paths import normalize_import_path
+from content_reader.source_access import inspect_source_selection
 from content_reader.store import StoreError, VaultStore
 from tests.test_store import sample_pdf
 
@@ -76,6 +77,93 @@ class FolderImportTest(unittest.TestCase):
 
     def test_standalone_upload_uses_the_filename_as_its_tree_path(self) -> None:
         self.assertEqual(normalize_import_path("Lecture 1.pdf", None), "Lecture 1.pdf")
+
+    def test_folder_access_references_sources_and_removal_keeps_disk_files(self) -> None:
+        source_root = self.root / "Course Files"
+        source_path = source_root / "Week 1" / "lecture.pdf"
+        source_path.parent.mkdir(parents=True)
+        source_path.write_bytes(sample_pdf(1))
+        descriptor = inspect_source_selection(str(source_root)).sources[0]
+
+        record = self.store.access_document(
+            source_path=descriptor.source_path,
+            library_path=descriptor.library_path,
+            course="ELEC2441",
+            title="Lecture",
+            lecture_date="2026-08-03",
+        )
+
+        self.assertEqual(record["source_mode"], "reference")
+        self.assertEqual(record["source_reference"], str(source_path.resolve()))
+        self.assertEqual(record["library_paths"], ["Course Files/Week 1/lecture.pdf"])
+        self.assertTrue(source_path.exists())
+        self.assertEqual(list(self.vault.rglob("*.pdf")), [])
+        raw_note = self.vault / record["raw_note_path"]
+        self.assertTrue(raw_note.exists())
+
+        result = self.store.remove_library_access(
+            document_id=record["id"],
+            library_path=descriptor.library_path,
+            kind="file",
+        )
+        self.assertEqual(result["hidden_document_ids"], [record["id"]])
+        self.assertEqual(self.store.list_documents(), [])
+        self.assertTrue(source_path.exists())
+        self.assertTrue(raw_note.exists())
+
+        restored = self.store.access_document(
+            source_path=descriptor.source_path,
+            library_path=descriptor.library_path,
+            course="ELEC2441",
+            title="Lecture",
+            lecture_date="2026-08-03",
+        )
+        self.assertEqual(restored["id"], record["id"])
+        self.assertEqual(restored["raw_note_path"], record["raw_note_path"])
+
+    def test_removing_folder_access_removes_only_matching_tree_aliases(self) -> None:
+        source_path = self.root / "lecture.pdf"
+        source_path.write_bytes(sample_pdf(1))
+        record = self.store.access_document(
+            source_path=source_path,
+            library_path="Semester/Week 1/lecture.pdf",
+            course="ELEC2441",
+            title="Lecture",
+        )
+        self.store.access_document(
+            source_path=source_path,
+            library_path="Semester/Review/lecture.pdf",
+            course="ELEC2441",
+            title="Lecture",
+        )
+
+        self.store.remove_library_access(
+            document_id=None,
+            library_path="Semester/Week 1",
+            kind="folder",
+        )
+
+        visible = self.store.list_documents()[0]
+        self.assertEqual(visible["id"], record["id"])
+        self.assertEqual(visible["library_paths"], ["Semester/Review/lecture.pdf"])
+        self.assertTrue(source_path.exists())
+
+    def test_unavailable_reference_degrades_only_that_library_record(self) -> None:
+        source_path = self.root / "lecture.pdf"
+        source_path.write_bytes(sample_pdf(1))
+        record = self.store.access_document(
+            source_path=source_path,
+            library_path="lecture.pdf",
+            course="ELEC2441",
+            title="Lecture",
+        )
+        source_path.unlink()
+
+        visible = self.store.list_documents()[0]
+
+        self.assertEqual(visible["id"], record["id"])
+        self.assertFalse(visible["source_available"])
+        self.assertTrue((self.vault / visible["raw_note_path"]).exists())
 
 
 if __name__ == "__main__":

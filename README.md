@@ -51,7 +51,7 @@ The hosted workspace is only the interface. Before it can display a library, eac
 4. If Chrome asks, allow this site to connect to apps on this device. Older Chrome versions may describe this as local-network access.
 5. In the local **Connect Margin** window, verify that the requester is `https://icycrucifix.github.io`, then choose **Allow connection**.
 
-Chrome receives access only to Margin on this computer through the loopback address. The companion receives read/write access only to the notes folder or Obsidian vault selected during setup and to lecture files the user explicitly imports. GitHub receives no lecture files, notes, vault paths, session token, or filesystem access.
+Chrome receives access only to Margin on this computer through the loopback address. The companion reads only lecture files and folders the user explicitly opens, in their existing locations, and writes only raw/polished notes plus Margin metadata to the configured notes folder or Obsidian vault. GitHub receives no lecture files, notes, vault paths, session token, or filesystem access.
 
 If the browser blocks the confirmation window or the connection still fails, see [Hosted-workspace permissions and troubleshooting](docs/setup.md#connect-the-hosted-workspace).
 
@@ -70,15 +70,15 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 
 ## Stage 1: take page-linked notes
 
-1. Choose **Open lecture** for one `.pdf` or `.pptx`, or **Open folder** to import supported lectures recursively.
+1. Choose **Open file or folder**, then select one `.pdf`/`.pptx` or a folder whose supported lectures Margin should access recursively.
 2. Enter the course code, lecture title, and date.
-3. Select a thumbnail, or focus the viewer and use **Left/Right Arrow**, to change pages.
+3. Select a thumbnail, or focus the viewer and use **Left/Right Arrow** or **Up/Down Arrow**, to change pages.
 4. Write Markdown in the right-hand editor. `$...$` and `$$...$$` math renders in place.
 5. Type `\` followed by a symbol name for LaTeX suggestions such as `\omega` and `\Omega`.
 
-Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains untouched.
-Re-uploading a revised file under the same filename carries the earlier page memos into the new copy, and edits remain shared across every same-named upload.
-If a page or slide does not render, choose **Reload file** in the viewer toolbar. Margin retries the lecture images without re-importing the source or changing which memo belongs to each page.
+Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains at its original disk path and is never copied into Obsidian.
+Removing a file or folder from Margin changes only the library display. Its disk source and all raw and polished notes remain untouched, and reopening the same source reconnects the existing note record.
+If a page or slide does not render, choose **Reload file** in the viewer toolbar. Margin retries the lecture images without changing the source or which memo belongs to each page.
 Choose **Shortcuts** in the top toolbar, or press `?` outside the memo editor, to display the keyboard shortcut list.
 
 Use the translate icon in the top toolbar to switch the interface between English and Simplified Chinese. The dialog can apply that choice to the interface only, or also set the language for polished notes. If the selected lecture already has a polished note in another language, Margin lets you keep the current note for future runs or mark it for a guarded repolish.

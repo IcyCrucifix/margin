@@ -224,10 +224,16 @@ class VaultStore:
         )
 
     def list_documents(self) -> list[dict[str, Any]]:
-        documents = self._load_library()["documents"]
+        documents = [
+            document
+            for document in self._load_library()["documents"]
+            if not document.get("hidden_from_library", False)
+        ]
         for document in documents:
-            if not isinstance(document.get("import_paths"), list) or not document["import_paths"]:
-                document["import_paths"] = [document.get("filename") or document.get("title", "Lecture")]
+            paths = self._library_paths(document)
+            document["library_paths"] = paths
+            document["import_paths"] = paths  # Compatibility for older web clients.
+            document["source_available"] = self._source_absolute(document).is_file()
             document.setdefault("polished_note_language", DEFAULT_LANGUAGE)
             document.setdefault("installed_polished_note_language", None)
             document.setdefault("language_repolish_requested", False)
@@ -247,9 +253,54 @@ class VaultStore:
 
     def get_document(self, document_id: str) -> dict[str, Any]:
         for document in self._load_library()["documents"]:
-            if document["id"] == document_id:
+            if document["id"] == document_id and not document.get("hidden_from_library", False):
                 return document
         raise StoreError("Lecture not found.")
+
+    @staticmethod
+    def _library_paths(document: dict[str, Any]) -> list[str]:
+        if document.get("hidden_from_library", False):
+            return []
+        stored = document.get("library_paths")
+        if not isinstance(stored, list) or not stored:
+            stored = document.get("import_paths")
+        paths = [path for path in stored or [] if isinstance(path, str) and path]
+        if not paths and document.get("filename"):
+            paths = [normalize_import_path(document["filename"], None)]
+        return list(dict.fromkeys(paths))
+
+    def _source_absolute(self, document: dict[str, Any]) -> Path:
+        if document.get("source_mode") == "reference":
+            candidates = [
+                access.get("source_path")
+                for access in document.get("source_accesses", [])
+                if isinstance(access, dict)
+            ]
+            candidates.append(document.get("source_reference"))
+            for candidate in candidates:
+                if isinstance(candidate, str) and candidate and Path(candidate).is_file():
+                    return Path(candidate)
+            fallback = document.get("source_reference") or document.get("source_path", "")
+            return Path(str(fallback))
+        return self.vault / document["source_path"]
+
+    def _source_link(
+        self,
+        document: dict[str, Any],
+        label: str,
+        *,
+        from_path: str,
+        page: int | None = None,
+        embed: bool = False,
+    ) -> str:
+        if document.get("source_mode") != "reference":
+            return self._link(
+                document["source_path"], label, from_path=from_path, page=page, embed=embed
+            )
+        destination = self._source_absolute(document).as_uri()
+        if page is not None:
+            destination = f"{destination}#page={page}"
+        return f"[{label}]({destination})"
 
     @staticmethod
     def _filename_key(filename: Any) -> str:
@@ -270,19 +321,36 @@ class VaultStore:
             if self._filename_key(document.get("filename")) == filename_key
         ]
 
-    @staticmethod
-    def _register_import_path(document: dict[str, Any], import_path: str) -> bool:
-        stored_paths = document.get("import_paths")
-        paths = stored_paths if isinstance(stored_paths, list) else []
-        paths = [path for path in paths if isinstance(path, str) and path]
-        if not paths and document.get("filename"):
-            paths.append(normalize_import_path(document["filename"], None))
-        if import_path not in paths:
-            paths.append(import_path)
-        if stored_paths == paths:
-            return False
+    def _register_library_access(
+        self,
+        document: dict[str, Any],
+        library_path: str,
+        source_reference: Path | None,
+    ) -> bool:
+        paths = self._library_paths(document)
+        changed = document.get("hidden_from_library", False)
+        if library_path not in paths:
+            paths.append(library_path)
+            changed = True
+        document["library_paths"] = paths
         document["import_paths"] = paths
-        return True
+        document["hidden_from_library"] = False
+        if source_reference is None:
+            return changed
+
+        accesses = [
+            access
+            for access in document.get("source_accesses", [])
+            if isinstance(access, dict) and access.get("library_path") != library_path
+        ]
+        access = {"library_path": library_path, "source_path": str(source_reference)}
+        accesses.append(access)
+        if access not in document.get("source_accesses", []):
+            changed = True
+        document["source_mode"] = "reference"
+        document["source_reference"] = str(source_reference)
+        document["source_accesses"] = accesses
+        return changed
 
     def _unique_note_path(
         self,
@@ -316,9 +384,62 @@ class VaultStore:
         polished_note_language: str | None = None,
         import_path: str | None = None,
     ) -> dict[str, Any]:
+        """Retain upload compatibility; current clients use access_document instead."""
+        return self._add_document(
+            filename=filename,
+            content=content,
+            course=course,
+            title=title,
+            lecture_date=lecture_date,
+            polished_note_language=polished_note_language,
+            library_path=import_path,
+            source_reference=None,
+        )
+
+    def access_document(
+        self,
+        *,
+        source_path: Path | str,
+        library_path: str | None,
+        course: str,
+        title: str,
+        lecture_date: str | None = None,
+        polished_note_language: str | None = None,
+    ) -> dict[str, Any]:
+        source = Path(source_path).expanduser()
+        if not source.is_absolute():
+            raise StoreError("The selected source path must be absolute.")
+        try:
+            source = source.resolve(strict=True)
+            content = source.read_bytes()
+        except OSError as exc:
+            raise StoreError("The selected source file is no longer available.") from exc
+        return self._add_document(
+            filename=source.name,
+            content=content,
+            course=course,
+            title=title,
+            lecture_date=lecture_date,
+            polished_note_language=polished_note_language,
+            library_path=library_path,
+            source_reference=source,
+        )
+
+    def _add_document(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        course: str,
+        title: str,
+        lecture_date: str | None,
+        polished_note_language: str | None,
+        library_path: str | None,
+        source_reference: Path | None,
+    ) -> dict[str, Any]:
         self.ensure_layout()
         try:
-            import_path = normalize_import_path(filename, import_path)
+            library_path = normalize_import_path(filename, library_path)
         except ValueError as exc:
             raise StoreError(str(exc)) from exc
         suffix = Path(filename).suffix.lower()
@@ -348,8 +469,9 @@ class VaultStore:
         library = self._load_library()
         for existing in library["documents"]:
             if existing["id"] == document_id:
-                if self._register_import_path(existing, import_path):
+                if self._register_library_access(existing, library_path, source_reference):
                     self._save_library(library)
+                    self.write_hub(library["documents"])
                 return existing
         same_filename_documents = self._same_filename_documents(
             library["documents"], filename
@@ -357,15 +479,21 @@ class VaultStore:
         shared_notes = self._shared_notes(same_filename_documents)
 
         course_destination = self._course_destination(course)
-        source_filename = f"{lecture_date} - {title} - {document_id[:6]}{suffix}"
         if course_destination:
             lecture_root = course_destination / "Lecture Notes"
-            source_relative = lecture_root / "_Sources" / source_filename
         else:
             lecture_root = Path(self.notes_root_name)
-            source_relative = lecture_root / "_Sources" / course / source_filename
-        source_path = self.vault / source_relative
-        _atomic_write_bytes(source_path, content)
+        if source_reference is None:
+            source_filename = f"{lecture_date} - {title} - {document_id[:6]}{suffix}"
+            source_relative = lecture_root / "_Sources" / source_filename
+            if not course_destination:
+                source_relative = lecture_root / "_Sources" / course / source_filename
+            source_path = self.vault / source_relative
+            _atomic_write_bytes(source_path, content)
+            source_value = source_relative.as_posix()
+        else:
+            source_path = source_reference
+            source_value = str(source_reference)
 
         page_text, page_count = self._extract_source_text(source_path, suffix)
         rendered_pdf = self._prepare_rendered_pdf(source_path, suffix, document_id)
@@ -403,7 +531,8 @@ class VaultStore:
         record: dict[str, Any] = {
             "id": document_id,
             "filename": filename,
-            "import_paths": [import_path],
+            "library_paths": [library_path],
+            "import_paths": [library_path],
             "title": title,
             "course": course,
             "course_destination": course_destination.as_posix() if course_destination else None,
@@ -411,7 +540,14 @@ class VaultStore:
             "kind": suffix.lstrip("."),
             "page_count": page_count,
             "source_sha256": digest,
-            "source_path": source_relative.as_posix(),
+            "source_path": source_value,
+            "source_mode": "reference" if source_reference else "managed-copy",
+            "source_reference": str(source_reference) if source_reference else None,
+            "source_accesses": (
+                [{"library_path": library_path, "source_path": str(source_reference)}]
+                if source_reference
+                else []
+            ),
             "raw_note_path": raw_relative.as_posix(),
             "polished_note_path": polished_relative.as_posix(),
             "polished_note_language": polished_note_language,
@@ -436,6 +572,64 @@ class VaultStore:
         self._save_library(library)
         self.write_hub(library["documents"])
         return record
+
+    def remove_library_access(
+        self,
+        *,
+        document_id: str | None,
+        library_path: str,
+        kind: str,
+    ) -> dict[str, Any]:
+        if kind not in {"file", "folder"}:
+            raise StoreError("Library entry kind must be file or folder.")
+        path = library_path.replace("\\", "/").strip("/")
+        if not path or any(part in {".", ".."} for part in path.split("/")):
+            raise StoreError("The library path is invalid.")
+        library = self._load_library()
+        removed = 0
+        hidden_ids: list[str] = []
+        for document in library["documents"]:
+            if document.get("hidden_from_library", False):
+                continue
+            if kind == "file" and document.get("id") != document_id:
+                continue
+            paths = self._library_paths(document)
+            matches = {
+                candidate
+                for candidate in paths
+                if candidate == path
+                or (kind == "folder" and candidate.startswith(f"{path}/"))
+            }
+            if not matches:
+                continue
+            remaining = [candidate for candidate in paths if candidate not in matches]
+            document["library_paths"] = remaining
+            document["import_paths"] = remaining
+            accesses = document.get("source_accesses", [])
+            remaining_accesses = [
+                access
+                for access in accesses
+                if not isinstance(access, dict) or access.get("library_path") not in matches
+            ]
+            document["source_accesses"] = remaining_accesses
+            if document.get("source_mode") == "reference":
+                document["source_reference"] = next(
+                    (
+                        access.get("source_path")
+                        for access in remaining_accesses
+                        if isinstance(access, dict) and access.get("source_path")
+                    ),
+                    None,
+                )
+            if not remaining:
+                document["hidden_from_library"] = True
+                hidden_ids.append(document["id"])
+            removed += len(matches)
+        if not removed:
+            raise StoreError("That library entry is no longer present.")
+        self._save_library(library)
+        self.write_hub(library["documents"])
+        return {"removed_count": removed, "hidden_document_ids": hidden_ids}
 
     def _course_destination(self, course: str) -> Path | None:
         if self.storage_mode != "obsidian":
@@ -474,6 +668,7 @@ class VaultStore:
         library = self._load_library()
         changes: list[dict[str, str]] = []
         for record in library["documents"]:
+            managed_source = record.get("source_mode") != "reference"
             destination = self._course_destination(record["course"])
             destination_value = destination.as_posix() if destination else None
             if record.get("course_destination") == destination_value:
@@ -496,11 +691,14 @@ class VaultStore:
                 "polished_note_path": record["polished_note_path"],
             }
             new_paths = {
-                "source_path": new_source.as_posix(),
+                "source_path": new_source.as_posix() if managed_source else record["source_path"],
                 "raw_note_path": new_raw.as_posix(),
                 "polished_note_path": new_polished.as_posix(),
             }
-            for key in ("source_path", "raw_note_path", "polished_note_path"):
+            moved_keys = ["raw_note_path", "polished_note_path"]
+            if managed_source:
+                moved_keys.insert(0, "source_path")
+            for key in moved_keys:
                 old_absolute = self.vault / old_paths[key]
                 new_absolute = self.vault / new_paths[key]
                 if old_absolute == new_absolute or not old_absolute.exists():
@@ -516,7 +714,7 @@ class VaultStore:
                     shutil.move(str(old_absolute), str(new_absolute))
 
             replacements: list[tuple[str, str]] = []
-            for key in ("source_path", "raw_note_path", "polished_note_path"):
+            for key in moved_keys:
                 old_value = old_paths[key]
                 new_value = new_paths[key]
                 replacements.append((old_value, new_value))
@@ -534,7 +732,7 @@ class VaultStore:
 
             record.update(new_paths)
             record["course_destination"] = destination_value
-            if record["kind"] == "pdf":
+            if managed_source and record["kind"] == "pdf":
                 record["rendered_pdf_path"] = str(self.vault / new_paths["source_path"])
             changes.append(
                 {
@@ -629,8 +827,8 @@ class VaultStore:
 
     def _raw_note_template(self, record: dict[str, Any]) -> str:
         source_label = "Original PDF" if record["kind"] == "pdf" else "Original PowerPoint"
-        source_link = self._link(
-            record["source_path"], source_label, from_path=record["raw_note_path"]
+        source_link = self._source_link(
+            record, source_label, from_path=record["raw_note_path"]
         )
         polished_link = self._link(
             record["polished_note_path"],
@@ -672,8 +870,8 @@ class VaultStore:
                 ]
             )
             if record["kind"] == "pdf":
-                page_link = self._link(
-                    record["source_path"],
+                page_link = self._source_link(
+                    record,
                     f"Open original PDF at page {page_number}",
                     from_path=record["raw_note_path"],
                     page=page_number,
@@ -1022,7 +1220,7 @@ class VaultStore:
                 item.setdefault("polished_note_language", DEFAULT_LANGUAGE)
                 item["raw_note_absolute"] = str(self.vault / record["raw_note_path"])
                 item["extracted_absolute"] = str(self.vault / record["extracted_path"])
-                item["source_absolute"] = str(self.vault / record["source_path"])
+                item["source_absolute"] = str(self._source_absolute(record))
                 item["polished_note_absolute"] = str(polished_path)
                 pending.append(item)
         return pending
@@ -1079,8 +1277,8 @@ class VaultStore:
 
         polished_path = self.vault / record["polished_note_path"]
         language = language_spec(record.get("polished_note_language"))
-        source_link = self._link(
-            record["source_path"],
+        source_link = self._source_link(
+            record,
             language.source_link_label,
             from_path=record["polished_note_path"],
         )
@@ -1150,9 +1348,11 @@ class VaultStore:
         ]
         courses: dict[str, list[dict[str, Any]]] = {}
         for document in documents:
+            if document.get("hidden_from_library", False):
+                continue
             courses.setdefault(document["course"], []).append(document)
         if not courses:
-            lines.append("_No lectures imported yet._")
+            lines.append("_No lecture files are open in Margin yet._")
         for course in sorted(courses, key=str.casefold):
             lines.extend(
                 [
@@ -1174,11 +1374,11 @@ class VaultStore:
                 polished_link = self._link(
                     document["polished_note_path"], polished_label, from_path=hub_relative
                 )
-                source_link = self._link(
-                    document["source_path"], document["kind"].upper(), from_path=hub_relative
+                source_link = self._source_link(
+                    document, document["kind"].upper(), from_path=hub_relative
                 )
-                lecture_link = self._link(
-                    document["source_path"],
+                lecture_link = self._source_link(
+                    document,
                     document.get("filename") or document["title"],
                     from_path=hub_relative,
                 )

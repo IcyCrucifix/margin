@@ -52,7 +52,7 @@ cp config.obsidian.example.json config.json
 
 Set `vault_path` to an existing vault containing `.obsidian/`. Obsidian mode uses wiki links, PDF page embeds, and optional course-folder routing. See [obsidian-sync.md](obsidian-sync.md).
 
-Choose one storage mode before importing lectures. Margin does not automatically rewrite an existing library when switching modes.
+Choose one storage mode before opening lectures. Margin does not automatically rewrite an existing library when switching modes.
 
 ## Configuration
 
@@ -64,7 +64,7 @@ Choose one storage mode before importing lectures. Margin does not automatically
 | `notes_root` | Margin library folder inside the selected root | `Lecture Notes` |
 | `route_to_existing_course_folder` | Obsidian-only routing to matching course folders | `true` in the Obsidian example |
 | `host` / `port` | local server address | `127.0.0.1` / `4317` |
-| `max_upload_mb` | maximum imported file size | `250` |
+| `max_upload_mb` | compatibility limit for pre-1.3 upload clients | `250` |
 | `polish_command` | custom local AI command array; `null` uses Codex | `null` |
 | `auto_polish` | optional built-in daily pending queue | disabled |
 
@@ -89,8 +89,8 @@ The hosted interface at <https://icycrucifix.github.io/margin/workspace/> does n
 | Chrome loopback permission | lets the HTTPS workspace call the companion running on the same computer | `https://icycrucifix.github.io` to `http://127.0.0.1:4317` only |
 | Pairing confirmation | proves that the user intentionally approved this browser tab | one origin-scoped session held only in JavaScript memory |
 | Pop-up permission, if blocked | opens the local confirmation page after the user clicks **Connect** | the local `/connect` window only |
-| Notes-folder or vault access | lets the companion save sources, raw memos, and polished notes | only the folder or Obsidian vault configured in `config.json` |
-| Lecture-file access | lets the companion copy and render a PDF or PowerPoint | only files the user explicitly selects or drops into Margin |
+| Notes-folder or vault access | lets the companion save raw memos, polished notes, extracted text, and library metadata | only the folder or Obsidian vault configured in `config.json` |
+| Lecture-file access | lets the companion read and render a PDF or PowerPoint in place | only files or folders the user explicitly opens in Margin |
 
 Recent Chrome versions split access to the local machine from access to other devices on the local network. Because Margin connects to `127.0.0.1`, it needs the loopback permission, which Chrome may label **Apps on device**. Older Chrome versions may show the combined **Local network** permission instead. Margin does not scan the LAN and does not need router, printer, or other-device access.
 
