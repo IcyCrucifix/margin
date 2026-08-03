@@ -388,6 +388,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             title = self._query_value(query, "title")
             lecture_date = self._query_value(query, "date")
             polished_note_language = query.get("polished_note_language", ["en"])[0]
+            import_path = query.get("import_path", [None])[0]
             length = self._content_length()
             if length > self.server.max_upload_bytes:
                 raise StoreError("That file is larger than the configured import limit.")
@@ -400,6 +401,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     title=title,
                     lecture_date=lecture_date,
                     polished_note_language=polished_note_language,
+                    import_path=import_path,
                 )
             self._json({"document": record}, HTTPStatus.CREATED)
             return

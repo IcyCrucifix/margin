@@ -31,6 +31,7 @@ const FALLBACK_LANGUAGE_OPTIONS = Object.freeze([
 const TOAST_FADE_DURATION_MS = 240;
 const elements = {
   openFileButton: $("#openFileButton"), emptyOpenButton: $("#emptyOpenButton"), fileInput: $("#fileInput"),
+  openFolderButton: $("#openFolderButton"), folderInput: $("#folderInput"),
   polishPendingButton: $("#polishPendingButton"), autoPolishStatus: $("#autoPolishStatus"),
   librarySearch: $("#librarySearch"), lectureList: $("#lectureList"), lectureCount: $("#lectureCount"),
   vaultStatusCard: $("#vaultStatusCard"), vaultStatusText: $("#vaultStatusText"), vaultLabel: $("#vaultLabel"),
@@ -46,6 +47,9 @@ const elements = {
   importForm: $("#importForm"), importFileKind: $("#importFileKind"), importFileName: $("#importFileName"),
   importFileSize: $("#importFileSize"), importCourse: $("#importCourse"), importTitle: $("#importTitle"),
   importDate: $("#importDate"), importSubmit: $("#importSubmit"), toast: $("#toast"),
+  folderDialog: $("#folderDialog"), folderForm: $("#folderForm"), folderName: $("#folderName"),
+  folderSummary: $("#folderSummary"), folderCourse: $("#folderCourse"), folderProgress: $("#folderProgress"),
+  folderSubmit: $("#folderSubmit"), folderCancel: $("#folderCancel"),
   polishDialog: $("#polishDialog"), polishDialogTitle: $("#polishDialogTitle"),
   polishAvailabilityMessage: $("#polishAvailabilityMessage"), polishRunnerReason: $("#polishRunnerReason"),
   directPolishButton: $("#directPolishButton"), copyManualPromptButton: $("#copyManualPromptButton"),
@@ -148,7 +152,7 @@ async function checkVaultConnection() {
 
 function renderLibrary() {
   const query = elements.librarySearch.value.trim().toLowerCase();
-  const visible = state.documents.filter((doc) => `${doc.course} ${doc.title} ${doc.lecture_date}`.toLowerCase().includes(query));
+  const tree = window.MarginFolderTree.buildTree(state.documents, query);
   elements.lectureCount.textContent = String(state.documents.length);
   const pendingCount = state.documents.filter((doc) => doc.has_notes && !doc.polished_current).length;
   elements.polishPendingButton.disabled = state.batchRunning || pendingCount === 0;
@@ -160,22 +164,18 @@ function renderLibrary() {
         : t("library.nothing_pending");
   }
   elements.lectureList.replaceChildren();
-  if (!visible.length) {
+  if (!window.MarginFolderTree.fileCount(tree)) {
     const empty = document.createElement("div");
     empty.className = "library-empty";
     empty.textContent = state.documents.length ? t("library.no_matching") : t("library.empty");
     elements.lectureList.append(empty);
     return;
   }
-  visible.forEach((doc) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `lecture-card${state.active?.id === doc.id ? " active" : ""}`;
-    button.innerHTML = `<span class="lecture-icon">${doc.kind.toUpperCase()}</span><span><strong></strong><span></span></span><i class="note-pip${doc.has_notes ? " has-notes" : ""}"></i>`;
-    button.querySelector("strong").textContent = doc.title;
-    button.querySelectorAll(":scope > span")[1].querySelector("span").textContent = `${doc.course} · ${formatDate(doc.lecture_date)}`;
-    button.addEventListener("click", () => selectDocument(doc.id));
-    elements.lectureList.append(button);
+  window.MarginFolderTree.render(elements.lectureList, tree, {
+    activeId: state.active?.id,
+    expandAll: Boolean(query),
+    formatDate,
+    onSelect: selectDocument,
   });
 }
 
@@ -848,13 +848,13 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keydown", (event) => {
   if (event.key !== "?" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
   if (isEditingTarget(event.target)) return;
-  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
+  if (elements.importDialog.open || elements.folderDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
   event.preventDefault();
   openShortcutHelp();
 }, { capture: true });
 window.addEventListener("keydown", (event) => {
   if (!state.active || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-  if (elements.importDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
+  if (elements.importDialog.open || elements.folderDialog.open || elements.polishDialog.open || elements.shortcutsDialog.open || elements.languageDialog.open || elements.languageConfirmDialog.open) return;
   if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   if (isEditingTarget(event.target)) return;
   event.preventDefault();
@@ -873,6 +873,28 @@ for (const eventName of ["dragleave", "drop"]) {
 document.addEventListener("drop", (event) => chooseFile(event.dataTransfer?.files?.[0]));
 
 if (!window.MarginEditor) throw new Error("The notes editor could not be loaded.");
+if (!window.MarginFolderTree || !window.MarginFolderImport) throw new Error("The folder library could not be loaded.");
+window.MarginFolderImport.initialize({
+  elements: {
+    button: elements.openFolderButton,
+    input: elements.folderInput,
+    dialog: elements.folderDialog,
+    form: elements.folderForm,
+    name: elements.folderName,
+    summary: elements.folderSummary,
+    course: elements.folderCourse,
+    progress: elements.folderProgress,
+    submit: elements.folderSubmit,
+    cancel: elements.folderCancel,
+  },
+  hasSession: () => window.MarginApi.hasSession(),
+  request: api,
+  mutationOptions: mutateOptions,
+  defaultNoteLanguage,
+  onImported: loadLibrary,
+  showToast,
+  t,
+});
 state.editor = window.MarginEditor.create({
   parent: elements.noteEditor,
   onChange: queueSave,

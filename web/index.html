@@ -11,12 +11,15 @@
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css?v=20260720-public3" />
     <link rel="stylesheet" href="./connection.css?v=20260720-public3" />
+    <link rel="stylesheet" href="./folder-tree.css?v=20260803-folder1" />
     <script src="./editor-bundle.js?v=20260720-public3" defer></script>
     <script src="./api-client.js?v=20260720-loopback1" defer></script>
     <!-- __PUBLIC_LOCALES__ -->
     <script src="./i18n.js?v=20260720-public3" defer></script>
     <script src="./workspace-connection.js?v=20260720-public3" defer></script>
-    <script src="./app.js?v=20260720-public3" defer></script>
+    <script src="./folder-tree.js?v=20260803-folder1" defer></script>
+    <script src="./folder-import.js?v=20260803-folder1" defer></script>
+    <script src="./app.js?v=20260803-folder1" defer></script>
   </head>
   <body>
     <section class="connection-gate" id="connectionGate" aria-labelledby="connectionTitle" hidden>
@@ -47,11 +50,15 @@
         <button class="open-button" id="openFileButton" type="button" data-i18n-aria-label="open.lecture">
           <span aria-hidden="true">＋</span> <span data-i18n="open.lecture">Open lecture</span>
         </button>
+        <button class="open-folder-button" id="openFolderButton" type="button" data-i18n-aria-label="folder.open">
+          <span aria-hidden="true">▰</span> <span data-i18n="folder.open">Open folder</span>
+        </button>
         <button class="batch-button" id="polishPendingButton" type="button" disabled>
           <span aria-hidden="true">✦</span>
           <span><strong data-i18n="polish.pending">Polish pending</strong><small id="autoPolishStatus" data-i18n="polish.manual_batch">Manual batch</small></span>
         </button>
         <input id="fileInput" type="file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+        <input id="folderInput" type="file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" webkitdirectory hidden />
 
         <label class="search-box">
           <span class="sr-only" data-i18n="library.filter">Search Library</span>
@@ -60,7 +67,7 @@
         </label>
 
         <div class="library-heading">
-          <span data-i18n="library.recent">Recent lectures</span>
+          <span data-i18n="library.files">Lecture files</span>
           <span id="lectureCount">0</span>
         </div>
         <nav class="lecture-list" id="lectureList" aria-live="polite"></nav>
@@ -172,6 +179,29 @@ Your thinking on the other.</span></h2>
         </section>
       </main>
     </div>
+
+    <dialog class="folder-dialog" id="folderDialog">
+      <form method="dialog" id="folderForm">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow" data-i18n="folder.eyebrow">ADD A FOLDER TREE</span>
+            <h2 data-i18n="folder.heading">Import lecture folder</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" data-i18n-aria-label="import.close" aria-label="Close">×</button>
+        </div>
+        <div class="folder-pill">
+          <span class="folder-pill-icon" aria-hidden="true">▰</span>
+          <div><strong id="folderName"></strong><span id="folderSummary"></span></div>
+        </div>
+        <label><span data-i18n="folder.course">Course for this folder</span><input id="folderCourse" required data-i18n-placeholder="folder.course_placeholder" placeholder="e.g. ELEC2441" autocomplete="off" /></label>
+        <p class="dialog-note" data-i18n="folder.note">Margin imports every PDF and PowerPoint in this folder and its subfolders. Other file types stay untouched.</p>
+        <p class="folder-progress" id="folderProgress" role="status" aria-live="polite" hidden></p>
+        <div class="dialog-actions">
+          <button id="folderCancel" value="cancel" type="submit" class="secondary-button" data-i18n="import.cancel">Cancel</button>
+          <button id="folderSubmit" value="default" type="submit" class="primary-button" data-i18n="folder.submit">Import folder</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="import-dialog" id="importDialog">
       <form method="dialog" id="importForm">

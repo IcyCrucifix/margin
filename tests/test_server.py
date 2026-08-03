@@ -76,11 +76,13 @@ class ServerIntegrationTest(unittest.TestCase):
                 "title": "Vectors",
                 "date": "2026-07-13",
                 "polished_note_language": "zh-Hans",
+                "import_path": "Semester 1/Week 2/lecture.pdf",
             }
         )
         imported = self.request(f"/api/import?{query}", method="POST", body=sample_pdf(1))
         document = imported["document"]
         self.assertEqual(document["polished_note_language"], "zh-Hans")
+        self.assertEqual(document["import_paths"], ["Semester 1/Week 2/lecture.pdf"])
         self.request(
             f"/api/doc/{document['id']}/note",
             method="PUT",

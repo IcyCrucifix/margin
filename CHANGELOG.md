@@ -1,10 +1,19 @@
 # Margin Update Log
 
-**Current version:** 1.2.0
+**Current version:** 1.2.1
 
-**Last updated:** July 20, 2026
+**Last updated:** August 3, 2026
 
 This is the canonical update history for Margin. The local copy and the copy published on GitHub are kept as the same version-controlled file.
+
+## Version 1.2.1 — Recursive folder library
+
+**Released:** August 3, 2026
+
+### New features
+
+- Added recursive folder import for PDF and PowerPoint lectures while leaving unsupported files untouched.
+- Added a collapsible, searchable folder tree that preserves nested paths across localhost and the hosted workspace.
 
 ## Version 1.2.0 — Secure hosted workspace
 

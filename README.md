@@ -18,6 +18,7 @@ Lecture slides and separate note documents quickly drift apart: a formula in you
 - **Write naturally.** Use Markdown, rendered math, and quick LaTeX suggestions such as `\omega` and `\Omega`.
 - **Keep your files.** The original lecture remains untouched, and your sources and notes stay on your own machine.
 - **Choose where notes live.** Use any ordinary folder or route everything into an existing Obsidian vault.
+- **Open a whole course tree.** Import a folder once to access supported lectures in all of its nested folders from a collapsible sidebar.
 - **Finish the job later.** After class, optional Stage 2 polishing can combine the lecture and your rough memos into a structured note.
 
 
@@ -69,7 +70,7 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 
 ## Stage 1: take page-linked notes
 
-1. Choose **Open lecture** and select a `.pdf` or `.pptx` file.
+1. Choose **Open lecture** for one `.pdf` or `.pptx`, or **Open folder** to import supported lectures recursively.
 2. Enter the course code, lecture title, and date.
 3. Select a thumbnail, or focus the viewer and use **Left/Right Arrow**, to change pages.
 4. Write Markdown in the right-hand editor. `$...$` and `$$...$$` math renders in place.

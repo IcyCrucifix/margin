@@ -15,6 +15,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from .import_paths import normalize_import_path
 from .pdf_rendering import render_pdf_page_to_png
 from .languages import DEFAULT_LANGUAGE, language_options, language_spec, validate_language
 
@@ -225,6 +226,8 @@ class VaultStore:
     def list_documents(self) -> list[dict[str, Any]]:
         documents = self._load_library()["documents"]
         for document in documents:
+            if not isinstance(document.get("import_paths"), list) or not document["import_paths"]:
+                document["import_paths"] = [document.get("filename") or document.get("title", "Lecture")]
             document.setdefault("polished_note_language", DEFAULT_LANGUAGE)
             document.setdefault("installed_polished_note_language", None)
             document.setdefault("language_repolish_requested", False)
@@ -267,6 +270,20 @@ class VaultStore:
             if self._filename_key(document.get("filename")) == filename_key
         ]
 
+    @staticmethod
+    def _register_import_path(document: dict[str, Any], import_path: str) -> bool:
+        stored_paths = document.get("import_paths")
+        paths = stored_paths if isinstance(stored_paths, list) else []
+        paths = [path for path in paths if isinstance(path, str) and path]
+        if not paths and document.get("filename"):
+            paths.append(normalize_import_path(document["filename"], None))
+        if import_path not in paths:
+            paths.append(import_path)
+        if stored_paths == paths:
+            return False
+        document["import_paths"] = paths
+        return True
+
     def _unique_note_path(
         self,
         relative: Path,
@@ -297,8 +314,13 @@ class VaultStore:
         title: str,
         lecture_date: str | None = None,
         polished_note_language: str | None = None,
+        import_path: str | None = None,
     ) -> dict[str, Any]:
         self.ensure_layout()
+        try:
+            import_path = normalize_import_path(filename, import_path)
+        except ValueError as exc:
+            raise StoreError(str(exc)) from exc
         suffix = Path(filename).suffix.lower()
         if suffix not in {".pdf", ".pptx"}:
             raise StoreError("Only PDF and PPTX files are supported.")
@@ -326,6 +348,8 @@ class VaultStore:
         library = self._load_library()
         for existing in library["documents"]:
             if existing["id"] == document_id:
+                if self._register_import_path(existing, import_path):
+                    self._save_library(library)
                 return existing
         same_filename_documents = self._same_filename_documents(
             library["documents"], filename
@@ -379,6 +403,7 @@ class VaultStore:
         record: dict[str, Any] = {
             "id": document_id,
             "filename": filename,
+            "import_paths": [import_path],
             "title": title,
             "course": course,
             "course_destination": course_destination.as_posix() if course_destination else None,

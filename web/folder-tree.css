@@ -1,0 +1,96 @@
+.open-folder-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .055);
+  color: #dbe3ef;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.open-folder-button:hover { background: rgba(255, 255, 255, .1); }
+.open-folder-button > span:first-child { color: var(--mint); font-size: 13px; }
+
+.file-tree-folder { min-width: 0; }
+.file-tree-folder-button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 12px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px 7px calc(6px + var(--tree-depth) * 13px);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #cad4e3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-tree-folder-button:hover { background: rgba(255, 255, 255, .06); }
+.file-tree-folder-button strong {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-tree-folder-button small { color: #728199; font-size: 8px; }
+.file-tree-chevron { color: #7f8da3; font-size: 16px; transition: transform .14s ease; }
+.file-tree-folder-button[aria-expanded="true"] .file-tree-chevron { transform: rotate(90deg); }
+.file-tree-folder-icon { color: #d8b66c; font-size: 10px; }
+
+.lecture-card.file-tree-file {
+  padding-left: calc(10px + var(--tree-depth) * 13px);
+}
+.lecture-card.file-tree-file .lecture-copy { min-width: 0; }
+
+.folder-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid #d5d0c5;
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 30px 90px rgba(20, 30, 47, .28);
+}
+.folder-dialog::backdrop { background: rgba(16, 27, 47, .55); backdrop-filter: blur(5px); }
+.folder-dialog form { padding: 24px; }
+.folder-dialog label { display: block; margin: 13px 0; color: #5f697b; font-size: 10px; font-weight: 750; }
+.folder-dialog input {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-top: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+.folder-pill {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 21px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #f8f6f0;
+}
+.folder-pill-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 8px; background: #e9d6a7; color: #735a24; }
+.folder-pill strong, .folder-pill span { display: block; }
+.folder-pill strong { max-width: 350px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.folder-pill div span { margin-top: 3px; color: #89909a; font-size: 9px; }
+.folder-progress { margin: 13px 0 0; color: #687486; font-size: 10px; line-height: 1.45; }
+
+@media (max-width: 820px) {
+  .open-folder-button { margin-top: 7px; }
+}
