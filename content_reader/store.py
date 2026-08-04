@@ -18,6 +18,12 @@ from typing import Any
 from .import_paths import normalize_import_path
 from .pdf_rendering import render_pdf_page_to_png
 from .languages import DEFAULT_LANGUAGE, language_options, language_spec, validate_language
+from .raw_note_lifecycle import (
+    RawNoteMarkerError,
+    archive_pristine_raw_note,
+    read_page_notes,
+    replace_page_note,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -131,6 +137,9 @@ class VaultStore:
         self.runtime_root = PROJECT_ROOT / "runtime"
         self.library_path = self.notes_root / ".content-reader" / "library.json"
         self.extracted_root = self.notes_root / ".content-reader" / "extracted"
+        self.empty_raw_archive_root = (
+            self.notes_root / ".content-reader" / "empty-raw-archive"
+        )
         self.rendered_root = self.runtime_root / "rendered"
         self.page_cache_root = self.runtime_root / "pages"
         self.drafts_root = self.runtime_root / "drafts"
@@ -559,11 +568,12 @@ class VaultStore:
             "updated_at": _now_iso(),
         }
 
-        raw_note = self._raw_note_template(record)
-        for page_number, note in shared_notes.items():
-            if page_number <= page_count:
-                raw_note = self._replace_page_note(raw_note, page_number, note)
-        _atomic_write_text(self.vault / raw_relative, raw_note)
+        if shared_notes:
+            raw_note = self._raw_note_template(record)
+            for page_number, note in shared_notes.items():
+                if page_number <= page_count:
+                    raw_note = self._replace_page_note(raw_note, page_number, note)
+            _atomic_write_text(self.vault / raw_relative, raw_note)
         _atomic_write_text(
             self.vault / extracted_relative,
             self._extracted_note_template(record, page_text),
@@ -995,17 +1005,9 @@ class VaultStore:
         raise StoreError("Lecture not found.")
 
     def _notes_for_record(self, record: dict[str, Any]) -> dict[str, str]:
-        raw_path = self.vault / record["raw_note_path"]
-        text = raw_path.read_text(encoding="utf-8")
-        notes: dict[str, str] = {}
-        for page_number in range(1, record["page_count"] + 1):
-            pattern = re.compile(
-                rf"<!-- content-reader:page:{page_number}:start -->\n(.*?)\n<!-- content-reader:page:{page_number}:end -->",
-                re.DOTALL,
-            )
-            match = pattern.search(text)
-            notes[str(page_number)] = match.group(1).strip("\n") if match else ""
-        return notes
+        return read_page_notes(
+            self.vault / record["raw_note_path"], record["page_count"]
+        )
 
     def _shared_notes(self, records: list[dict[str, Any]]) -> dict[int, str]:
         shared: dict[int, str] = {}
@@ -1030,18 +1032,10 @@ class VaultStore:
 
     @staticmethod
     def _replace_page_note(text: str, page_number: int, content: str) -> str:
-        pattern = re.compile(
-            rf"(<!-- content-reader:page:{page_number}:start -->)\n.*?\n(<!-- content-reader:page:{page_number}:end -->)",
-            re.DOTALL,
-        )
-        updated, count = pattern.subn(
-            lambda match: f"{match.group(1)}\n{content}\n{match.group(2)}",
-            text,
-            count=1,
-        )
-        if count != 1:
-            raise StoreError("The raw note page marker is missing or duplicated.")
-        return updated
+        try:
+            return replace_page_note(text, page_number, content)
+        except RawNoteMarkerError as exc:
+            raise StoreError(str(exc)) from exc
 
     def get_notes(self, document_id: str) -> dict[str, str]:
         return self._notes_for_record(self.get_document(document_id))
@@ -1071,7 +1065,12 @@ class VaultStore:
             raw_path = self.vault / document["raw_note_path"]
             text = pending_writes.get(raw_path)
             if text is None:
-                text = raw_path.read_text(encoding="utf-8")
+                try:
+                    text = raw_path.read_text(encoding="utf-8")
+                except FileNotFoundError:
+                    if not content.strip():
+                        continue
+                    text = self._raw_note_template(document)
             pending_writes[raw_path] = self._replace_page_note(
                 text, page_number, content
             )
@@ -1090,6 +1089,27 @@ class VaultStore:
             "has_notes": bool(content.strip()),
             "shared_document_count": len(matching_documents),
         }
+
+    def archive_pristine_raw_notes(self) -> int:
+        """Move untouched empty templates under hidden metadata for graph hygiene.
+
+        The exact-template check makes this idempotent and ensures that memo-bearing
+        or otherwise user-edited Markdown is never moved.
+        """
+        library = self._load_library()
+        archived_count = 0
+        for record in library["documents"]:
+            raw_path = self.vault / record["raw_note_path"]
+            archive_path = self.empty_raw_archive_root / f"{record['id']}.md"
+            if archive_pristine_raw_note(
+                raw_path,
+                archive_path,
+                self._raw_note_template(record),
+            ):
+                archived_count += 1
+        if archived_count:
+            self.write_hub(library["documents"])
+        return archived_count
 
     def _document_has_notes(self, record: dict[str, Any]) -> bool:
         try:
@@ -1370,7 +1390,12 @@ class VaultStore:
                     "language_repolish_requested", False
                 )
                 polished_label = "Open" if polished_current else "Pending"
-                raw_link = self._link(document["raw_note_path"], "Raw", from_path=hub_relative)
+                raw_path = self.vault / document["raw_note_path"]
+                raw_link = (
+                    self._link(document["raw_note_path"], "Raw", from_path=hub_relative)
+                    if raw_path.is_file()
+                    else "Not started"
+                )
                 polished_link = self._link(
                     document["polished_note_path"], polished_label, from_path=hub_relative
                 )

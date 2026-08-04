@@ -83,7 +83,8 @@ class FolderImportTest(unittest.TestCase):
         source_path = source_root / "Week 1" / "lecture.pdf"
         source_path.parent.mkdir(parents=True)
         source_path.write_bytes(sample_pdf(1))
-        descriptor = inspect_source_selection(str(source_root)).sources[0]
+        selection = inspect_source_selection(str(source_root))
+        descriptor = selection.sources[0]
 
         record = self.store.access_document(
             source_path=descriptor.source_path,
@@ -99,6 +100,9 @@ class FolderImportTest(unittest.TestCase):
         self.assertTrue(source_path.exists())
         self.assertEqual(list(self.vault.rglob("*.pdf")), [])
         raw_note = self.vault / record["raw_note_path"]
+        self.assertFalse(raw_note.exists())
+
+        self.store.save_note(record["id"], 1, "A retained memo.")
         self.assertTrue(raw_note.exists())
 
         result = self.store.remove_library_access(
@@ -163,7 +167,7 @@ class FolderImportTest(unittest.TestCase):
 
         self.assertEqual(visible["id"], record["id"])
         self.assertFalse(visible["source_available"])
-        self.assertTrue((self.vault / visible["raw_note_path"]).exists())
+        self.assertFalse((self.vault / visible["raw_note_path"]).exists())
 
 
 if __name__ == "__main__":

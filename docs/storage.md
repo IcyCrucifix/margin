@@ -13,12 +13,12 @@ Legacy configs that omit `storage_mode` keep the original Obsidian behavior. Pla
 
 ## Files created per lecture
 
-With the default `notes_root`, opening a source creates:
+With the default `notes_root`, opening a source registers paths and creates only the metadata needed to read it:
 
 | Artifact | Central location | Purpose |
 |---|---|---|
 | Source reference | original selected path outside or inside the notes root | read in place; never copied, moved, or deleted by Margin |
-| Raw note | `Lecture Notes/Raw/<course>/<date> - <title> - Raw Notes.md` | page-linked class memos |
+| Raw note | `Lecture Notes/Raw/<course>/<date> - <title> - Raw Notes.md` | created lazily when the first non-empty page memo is saved |
 | Extracted text | `Lecture Notes/.content-reader/extracted/<id>.md` | page-by-page source text for Stage 2 |
 | Polished note | `Lecture Notes/Polished/<course>/<date> - <title> - Polished.md` | installed by Stage 2 |
 
@@ -26,6 +26,8 @@ The library also contains:
 
 - `.content-reader/library.json` — machine index, source references/hashes, display paths, timestamps, the selected polished-note language, and the last polished input/request hashes;
 - `Lecture Notes Hub.md` — human-facing course index with links appropriate to the selected mode.
+
+The hub shows `Not started` instead of linking a nonexistent raw note. On upgrade, Margin moves only byte-for-byte untouched empty templates into the hidden `.content-reader/empty-raw-archive/` directory. Memo-bearing or otherwise edited raw notes are never moved.
 
 Each library record uses `polished_note_language` (`en` or `zh-Hans`) for the next polished note and `installed_polished_note_language` for the language of the file currently installed. A requested language change sets `language_repolish_requested` until Stage 2 installs the new version. This keeps raw memos, source paths, YAML keys, and tags language-neutral.
 
@@ -73,6 +75,7 @@ Obsidian mode preserves the original wiki-link, PDF-embed, and course-routing co
 ## Guarantees
 
 - Source files are read in place and never copied, moved, rewritten, or deleted.
+- Empty raw-note files are not created; the first non-empty autosave materializes the normal Markdown file atomically.
 - Page saves edit only their marker-delimited memo region.
 - Markdown and JSON writes are atomic (`tempfile` plus `os.replace`).
 - `$...$` and `$$...$$` math stays as source-compatible LaTeX.

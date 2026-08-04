@@ -14,7 +14,7 @@ Margin is a local-first workspace for taking notes directly beside lecture PDFs 
 
 Lecture slides and separate note documents quickly drift apart: a formula in your notes makes sense during class, but weeks later it is hard to remember which diagram, definition, or example it referred to. Margin keeps the two sides together.
 
-- **Stay beside the lecture.** Read a PDF or PowerPoint while writing a separate, autosaved memo for each page or slide.
+- **Stay beside the lecture.** Read a PDF or PowerPoint while writing an autosaved memo for each page or slide. Margin creates a raw-note file only after you write something.
 - **Write naturally.** Use Markdown, rendered math, and quick LaTeX suggestions such as `\omega` and `\Omega`.
 - **Keep your files.** The original lecture remains untouched, and your sources and notes stay on your own machine.
 - **Choose where notes live.** Use any ordinary folder or route everything into an existing Obsidian vault.
@@ -76,7 +76,7 @@ See [Codex_Explanation](Codex_Explanation.markdown) for more explanations for th
 4. Write Markdown in the right-hand editor. `$...$` and `$$...$$` math renders in place.
 5. Type `\` followed by a symbol name for LaTeX suggestions such as `\omega` and `\Omega`.
 
-Notes autosave. Each memo lives between stable page markers in a separate Markdown file; the lecture source remains at its original disk path and is never copied into Obsidian.
+Notes autosave. Margin does not create an empty raw-note file when a lecture is opened. The raw Markdown note appears only after the first non-empty memo is saved, with each memo kept between stable page markers; the lecture source remains at its original disk path and is never copied into Obsidian.
 Removing a file or folder from Margin changes only the library display. Its disk source and all raw and polished notes remain untouched, and reopening the same source reconnects the existing note record.
 If a page or slide does not render, choose **Reload file** in the viewer toolbar. Margin retries the lecture images without changing the source or which memo belongs to each page.
 Choose **Shortcuts** in the top toolbar, or press `?` outside the memo editor, to display the keyboard shortcut list.

@@ -648,6 +648,12 @@ def main() -> int:
     args = parser.parse_args()
     store = VaultStore(args.config)
     store.ensure_layout()
+    archived_count = store.archive_pristine_raw_notes()
+    if archived_count:
+        print(
+            f"Margin hid {archived_count} untouched empty raw note(s) "
+            "from the notes graph."
+        )
     host = args.host or store.config.get("host", "127.0.0.1")
     port = args.port or int(store.config.get("port", 4317))
     server = ContentReaderServer((host, port), store)

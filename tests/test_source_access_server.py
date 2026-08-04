@@ -65,6 +65,15 @@ class SourceAccessServerTest(unittest.TestCase):
             },
         )["document"]
         raw_note = self.vault / opened["raw_note_path"]
+        self.assertFalse(raw_note.exists())
+        empty_notes = self.request(f"/api/doc/{opened['id']}/notes")["notes"]
+        self.assertEqual(empty_notes, {"1": ""})
+        self.request(
+            f"/api/doc/{opened['id']}/note",
+            method="PUT",
+            payload={"page": 1, "content": "A real memo."},
+        )
+        self.assertTrue(raw_note.exists())
         query = urllib.parse.urlencode(
             {
                 "kind": "file",

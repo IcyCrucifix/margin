@@ -2,7 +2,7 @@
 
 **Current version:** 1.3.0
 
-**Last updated:** August 3, 2026
+**Last updated:** August 4, 2026
 
 This is the canonical update history for Margin. The local copy and the copy published on GitHub are kept as the same version-controlled file.
 
@@ -16,6 +16,7 @@ This is the canonical update history for Margin. The local copy and the copy pub
 - Margin now references selected PDF/PPTX files at their existing disk locations; only raw notes, polished notes, extracted text, and small library metadata are stored in the notes workspace or Obsidian vault.
 - Added non-destructive removal for library files and folders. Removing access never deletes the source, raw notes, or polished notes.
 - Added Up/Down Arrow page navigation alongside Left/Right Arrow in localhost, hosted, and app interfaces.
+- Raw-note Markdown is now created only after the first non-empty memo. Exact untouched legacy empty templates move under hidden Margin metadata so they no longer clutter Obsidian graphs; edited and memo-bearing notes are preserved.
 
 ## Version 1.2.1 — Recursive folder library
 

@@ -12,12 +12,12 @@ In Obsidian mode, the vault stores Margin's raw notes, polished notes, extracted
 
 ## Files created per lecture
 
-Opening a `.pdf`/`.pptx` registers one source reference and produces note artifacts:
+Opening a `.pdf`/`.pptx` registers one source reference without creating an empty raw note:
 
 | Artifact | Central location (default) | Purpose |
 |---|---|---|
 | Source reference | original selected path | read in place; never copied, moved, or deleted by Margin |
-| Raw note | `Lecture Notes/Raw/<course>/<date> - <title> - Raw Notes.md` | your page-linked class memos |
+| Raw note | `Lecture Notes/Raw/<course>/<date> - <title> - Raw Notes.md` | created after the first non-empty memo is saved |
 | Extracted text | `Lecture Notes/.content-reader/extracted/<id>.md` | machine-extracted page text, one `## Page N` per page, used by Stage 2 |
 | Polished note | `Lecture Notes/Polished/<course>/<date> - <title> - Polished.md` | created later by Stage 2 ([polish.md](polish.md)) |
 
@@ -26,9 +26,11 @@ Plus two vault-wide files:
 - `Lecture Notes/.content-reader/library.json` — the index. Each record holds `id` (16-hex digest of course+title+file hash), source references and display paths, note paths, `page_count`, `source_sha256`, timestamps, and `polished_input_hash` once polished. Opening the same course+title+file returns the existing record.
 - `Lecture Notes/Lecture Notes Hub.md` — a human-facing index note, one table per course with wiki links to raw/polished/source. Regenerated after every change.
 
+Before a memo exists, the hub displays `Not started` and contains no raw-note wiki link, so the unopened raw note cannot appear as an unresolved graph node. During upgrade, only exact untouched empty templates are moved into the hidden `.content-reader/empty-raw-archive/` folder; any file with memo content or another user edit remains in place.
+
 ## Raw note format (the sync-critical part)
 
-The raw note is a normal Obsidian Markdown file with YAML frontmatter (`content_reader: raw`, `document_id`, `course`, `lecture_date`, `source_sha256`, `page_count`, `status`, and the linked paths). For each page it contains:
+After the first non-empty memo, the raw note is a normal Obsidian Markdown file with YAML frontmatter (`content_reader: raw`, `document_id`, `course`, `lecture_date`, `source_sha256`, `page_count`, `status`, and the linked paths). For each page it contains:
 
 ```markdown
 ## Page 3
@@ -68,6 +70,7 @@ The shallowest match wins. If no folder matches (or routing is off), the central
 ## Guarantees
 
 - Source files are read in place and never copied, moved, rewritten, or deleted; memos are the only note region tooling edits, and only between markers.
+- Opening a lecture never creates an empty graph-visible raw note; the first real memo creates it atomically.
 - All Markdown/JSON writes are atomic (`tempfile` + `os.replace`) — a crash cannot leave a half-written note.
 - Everything is plain Markdown with `$…$` / `$$…$$` math — the vault stays fully usable if you stop using Margin.
 - Page images and Stage-2 drafts are cached under the project's `runtime/` folder, **outside** the vault, so sync tools (Obsidian Sync, iCloud, git) never see render caches.
